@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Comentarios con Wander + Arweave (Debug)</title>
+  <title>Comentarios con Wander + Arweave (Respuestas)</title>
   <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
@@ -14,7 +14,7 @@
   </style>
 </head>
 <body>
-  <h2>💬 Sistema de Comentarios (con Debug)</h2>
+  <h2>💬 Sistema de Comentarios (con Respuestas + Debug)</h2>
 
   <button id="connectBtn">Conectar Wallet</button>
   <button id="disconnectBtn">Desconectar Wallet</button>
@@ -75,33 +75,34 @@
       }
     };
 
-    // Enviar comentario
-    sendCommentBtn.onclick = async () => {
+    // Enviar comentario (soporta respuestas)
+    async function sendComment(replyTo = "origin") {
       const text = commentInput.value.trim();
       if (!text) return alert("Escribe un comentario");
 
       try {
         const tx = await arweave.createTransaction({ data: text });
 
-        // Etiquetas para identificarlo como comentario
         tx.addTag("Content-Type", "text/plain");
         tx.addTag("type", "commentary");
-        tx.addTag("to", "origin"); // por ahora todos van a origin
+        tx.addTag("to", replyTo); // raíz o respuesta
         tx.addTag("page", window.location.pathname);
 
         const res = await window.arweaveWallet.dispatch(tx);
 
-        logDebug("📝 Comentario enviado con TxID: " + res.id + " | type: " + res.type);
+        logDebug(`📝 Comentario enviado a "${replyTo}" -> TxID: ${res.id}`);
         alert(`Comentario enviado.\nTxID: ${res.id}`);
 
         commentInput.value = "";
-        loadComments(); // recargar lista
+        loadComments();
       } catch (err) {
         logDebug("❌ Error al enviar comentario: " + err);
       }
-    };
+    }
 
-    // Cargar comentarios desde Arweave GraphQL
+    sendCommentBtn.onclick = () => sendComment("origin");
+
+    // Cargar comentarios desde Arweave
     async function loadComments() {
       commentsDiv.innerHTML = "Cargando comentarios...";
       logDebug("🔄 Cargando comentarios...");
@@ -112,10 +113,9 @@
             transactions(
               tags: [
                 { name: "type", values: ["commentary"] },
-                { name: "to", values: ["origin"] },
                 { name: "page", values: ["${window.location.pathname}"] }
               ],
-              first: 50,
+              first: 100,
               sort: HEIGHT_DESC
             ) {
               edges {
@@ -147,22 +147,58 @@
           return;
         }
 
+        // Mapear comentarios por ID y agrupar hijos
+        const commentsMap = {};
         for (const edge of edges) {
-          const commentText = await fetch(`https://arweave.net/${edge.node.id}`).then(r => r.text());
-          const div = document.createElement("div");
-          div.className = "comment";
-          div.innerHTML = `
-            <p>${commentText}</p>
-            <p class="txid">👤 ${edge.node.owner.address}<br>
-            TxID: <a href="https://arweave.net/${edge.node.id}" target="_blank">${edge.node.id}</a></p>
-          `;
-          commentsDiv.appendChild(div);
+          const node = edge.node;
+          const toTag = node.tags.find(t => t.name === "to")?.value || "origin";
 
-          logDebug("💬 Comentario cargado -> TxID: " + edge.node.id + " | Owner: " + edge.node.owner.address);
+          commentsMap[node.id] = { node, children: [] };
+
+          if (toTag !== "origin") {
+            if (!commentsMap[toTag]) commentsMap[toTag] = { children: [] };
+            commentsMap[toTag].children.push(node);
+          }
         }
+
+        // Renderizar solo los comentarios raíz
+        for (const edge of edges) {
+          const node = edge.node;
+          const toTag = node.tags.find(t => t.name === "to")?.value || "origin";
+          if (toTag !== "origin") continue;
+          await renderComment(node, commentsDiv, commentsMap);
+        }
+
       } catch (err) {
         logDebug("❌ Error al cargar comentarios: " + err);
         commentsDiv.textContent = "Error al cargar comentarios.";
+      }
+    }
+
+    // Renderizar comentario y sus respuestas
+    async function renderComment(node, container, commentsMap, depth = 0) {
+      const text = await fetch(`https://arweave.net/${node.id}`).then(r => r.text());
+      const div = document.createElement("div");
+      div.className = "comment";
+      div.style.marginLeft = `${depth * 20}px`;
+      div.innerHTML = `
+        <p>${text}</p>
+        <p class="txid">👤 ${node.owner.address}<br>
+        TxID: <a href="https://arweave.net/${node.id}" target="_blank">${node.id}</a></p>
+        <button class="replyBtn">↩️ Responder</button>
+      `;
+
+      const replyBtn = div.querySelector(".replyBtn");
+      replyBtn.onclick = () => {
+        commentInput.value = `@${node.owner.address} `;
+        sendComment(node.id);
+      };
+
+      container.appendChild(div);
+
+      // Renderizar hijos (respuestas)
+      for (const child of commentsMap[node.id]?.children || []) {
+        await renderComment(child, container, commentsMap, depth + 1);
       }
     }
 
