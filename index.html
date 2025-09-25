@@ -1,144 +1,173 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Comentarios con Arweave</title>
+  <title>Comentarios con Wander + Arweave (Debug)</title>
+  <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: #eee;
-      padding: 20px;
-    }
-    button {
-      margin: 5px;
-      padding: 10px 15px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    #connectBtn { background: #28a745; color: white; }
-    #disconnectBtn { background: #dc3545; color: white; }
-    #sendBtn { background: #007bff; color: white; }
-    textarea {
-      width: 100%;
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 5px;
-    }
-    .comment {
-      border: 1px solid #444;
-      padding: 10px;
-      margin-top: 10px;
-      border-radius: 5px;
-      background: #1a1a1a;
-    }
-    .comment a {
-      color: #0af;
-      text-decoration: none;
-    }
-    .comment a:hover {
-      text-decoration: underline;
-    }
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+    button { margin: 5px; padding: 8px 15px; cursor: pointer; }
+    #comments { margin-top: 20px; }
+    .comment { border-bottom: 1px solid #ccc; padding: 10px 0; }
+    .txid { font-size: 0.8em; color: gray; }
+    #debug { margin-top: 30px; background: #111; color: #0f0; padding: 10px; font-family: monospace; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <h1>💬 Sistema de Comentarios en Arweave</h1>
+  <h2>💬 Sistema de Comentarios (con Debug)</h2>
 
-  <!-- Botones -->
   <button id="connectBtn">Conectar Wallet</button>
-  <button id="disconnectBtn" disabled>Desconectar Wallet</button>
+  <button id="disconnectBtn">Desconectar Wallet</button>
+  <p id="walletAddress"></p>
 
-  <!-- Estado -->
-  <p id="walletAddress">Wallet: ❌ no conectada</p>
+  <textarea id="commentInput" placeholder="Escribe tu comentario..." rows="3" cols="50"></textarea><br>
+  <button id="sendCommentBtn">Enviar comentario</button>
 
-  <!-- Formulario comentario -->
-  <textarea id="commentInput" placeholder="Escribe tu comentario..."></textarea>
-  <br>
-  <button id="sendBtn" disabled>Enviar Comentario</button>
-
-  <h2>📜 Comentarios</h2>
+  <h3>Comentarios</h3>
   <div id="comments"></div>
 
-  <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
+  <h3>🔎 Debug Log</h3>
+  <div id="debug"></div>
+
   <script>
-    let walletAddress = null;
-
-    // === Conectar wallet ===
-    document.getElementById("connectBtn").onclick = async () => {
-      try {
-        const permissions = ["ACCESS_ADDRESS", "SIGN_TRANSACTION"];
-        walletAddress = await window.arweaveWallet.connect(permissions);
-        document.getElementById("walletAddress").innerText = "Wallet: 👤 " + walletAddress;
-        document.getElementById("connectBtn").disabled = true;
-        document.getElementById("disconnectBtn").disabled = false;
-        document.getElementById("sendBtn").disabled = false;
-      } catch (err) {
-        console.error("Error conectando wallet:", err);
-      }
-    };
-
-    // === Desconectar wallet ===
-    document.getElementById("disconnectBtn").onclick = async () => {
-      try {
-        await window.arweaveWallet.disconnect();
-        walletAddress = null;
-        document.getElementById("walletAddress").innerText = "Wallet: ❌ no conectada";
-        document.getElementById("connectBtn").disabled = false;
-        document.getElementById("disconnectBtn").disabled = true;
-        document.getElementById("sendBtn").disabled = true;
-      } catch (err) {
-        console.error("Error desconectando wallet:", err);
-      }
-    };
-
-    // === Enviar comentario ===
-    document.getElementById("sendBtn").onclick = async () => {
-      const text = document.getElementById("commentInput").value.trim();
-      if (!text) return alert("Escribe un comentario antes de enviar.");
-      if (!walletAddress) return alert("Conecta tu wallet primero.");
-
-      try {
-        const tx = await arweave.createTransaction({ data: text });
-        tx.addTag("Content-Type", "text/plain");
-        tx.addTag("type", "commentary");
-        tx.addTag("to", "origin"); // por ahora todos los comentarios son raíz
-
-        await window.arweaveWallet.signTransaction(tx);
-        const response = await arweave.transactions.post(tx);
-
-        console.log("Tx enviada:", response);
-        addCommentToDOM(walletAddress, text, tx.id, "origin", "commentary");
-
-        document.getElementById("commentInput").value = "";
-      } catch (err) {
-        console.error("Error enviando comentario:", err);
-      }
-    };
-
-    // === Mostrar un comentario en el DOM (con debug) ===
-    function addCommentToDOM(wallet, content, txId, to, type) {
-      const commentsDiv = document.getElementById("comments");
-      const div = document.createElement("div");
-      div.className = "comment";
-      div.innerHTML = `
-        <p><strong>👤 ${wallet}</strong></p>
-        <p>${content}</p>
-        <p>🔗 TxID: <a href="https://arweave.net/${txId}" target="_blank">${txId}</a></p>
-        <p>📌 To: ${to}</p>
-        <p>🏷️ Type: ${type}</p>
-      `;
-      commentsDiv.prepend(div); // el último comentario arriba
-    }
-
-    // === Inicializar Arweave ===
     const arweave = Arweave.init({
-      host: "arweave.net",
+      host: "ar-io.net",
       port: 443,
       protocol: "https"
     });
 
-    // 🔮 TODO: aquí podrías cargar comentarios previos desde GraphQL y llamas addCommentToDOM
+    const connectBtn = document.getElementById("connectBtn");
+    const disconnectBtn = document.getElementById("disconnectBtn");
+    const sendCommentBtn = document.getElementById("sendCommentBtn");
+    const walletAddressEl = document.getElementById("walletAddress");
+    const commentInput = document.getElementById("commentInput");
+    const commentsDiv = document.getElementById("comments");
+    const debugDiv = document.getElementById("debug");
+
+    let currentAddress = null;
+
+    function logDebug(msg) {
+      console.log(msg);
+      debugDiv.textContent += msg + "\n";
+    }
+
+    // Conectar wallet
+    connectBtn.onclick = async () => {
+      try {
+        await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
+        currentAddress = await window.arweaveWallet.getActiveAddress();
+        walletAddressEl.textContent = "Conectado: " + currentAddress;
+        logDebug("✅ Wallet conectada: " + currentAddress);
+      } catch (err) {
+        logDebug("❌ Error al conectar: " + err);
+      }
+    };
+
+    // Desconectar wallet
+    disconnectBtn.onclick = async () => {
+      try {
+        await window.arweaveWallet.disconnect();
+        currentAddress = null;
+        walletAddressEl.textContent = "Desconectado";
+        logDebug("ℹ️ Wallet desconectada.");
+      } catch (err) {
+        logDebug("❌ Error al desconectar: " + err);
+      }
+    };
+
+    // Enviar comentario
+    sendCommentBtn.onclick = async () => {
+      const text = commentInput.value.trim();
+      if (!text) return alert("Escribe un comentario");
+
+      try {
+        const tx = await arweave.createTransaction({ data: text });
+
+        // Etiquetas para identificarlo como comentario
+        tx.addTag("Content-Type", "text/plain");
+        tx.addTag("type", "commentary");
+        tx.addTag("to", "origin"); // por ahora todos van a origin
+        tx.addTag("page", window.location.pathname);
+
+        const res = await window.arweaveWallet.dispatch(tx);
+
+        logDebug("📝 Comentario enviado con TxID: " + res.id + " | type: " + res.type);
+        alert(`Comentario enviado.\nTxID: ${res.id}`);
+
+        commentInput.value = "";
+        loadComments(); // recargar lista
+      } catch (err) {
+        logDebug("❌ Error al enviar comentario: " + err);
+      }
+    };
+
+    // Cargar comentarios desde Arweave GraphQL
+    async function loadComments() {
+      commentsDiv.innerHTML = "Cargando comentarios...";
+      logDebug("🔄 Cargando comentarios...");
+
+      const query = {
+        query: `
+          query {
+            transactions(
+              tags: [
+                { name: "type", values: ["commentary"] },
+                { name: "to", values: ["origin"] },
+                { name: "page", values: ["${window.location.pathname}"] }
+              ],
+              first: 50,
+              sort: HEIGHT_DESC
+            ) {
+              edges {
+                node {
+                  id
+                  owner { address }
+                  tags { name value }
+                }
+              }
+            }
+          }
+        `
+      };
+
+      try {
+        const response = await fetch("https://arweave.net/graphql", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(query),
+        });
+
+        const result = await response.json();
+        const edges = result.data.transactions.edges;
+
+        commentsDiv.innerHTML = "";
+        if (edges.length === 0) {
+          commentsDiv.textContent = "No hay comentarios todavía.";
+          logDebug("⚠️ No hay comentarios.");
+          return;
+        }
+
+        for (const edge of edges) {
+          const commentText = await fetch(`https://arweave.net/${edge.node.id}`).then(r => r.text());
+          const div = document.createElement("div");
+          div.className = "comment";
+          div.innerHTML = `
+            <p>${commentText}</p>
+            <p class="txid">👤 ${edge.node.owner.address}<br>
+            TxID: <a href="https://arweave.net/${edge.node.id}" target="_blank">${edge.node.id}</a></p>
+          `;
+          commentsDiv.appendChild(div);
+
+          logDebug("💬 Comentario cargado -> TxID: " + edge.node.id + " | Owner: " + edge.node.owner.address);
+        }
+      } catch (err) {
+        logDebug("❌ Error al cargar comentarios: " + err);
+        commentsDiv.textContent = "Error al cargar comentarios.";
+      }
+    }
+
+    // Al cargar la página
+    loadComments();
   </script>
 </body>
 </html>
