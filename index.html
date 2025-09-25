@@ -2,77 +2,132 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Conectar / Desconectar Wander Wallet</title>
+  <title>Sistema de Comentarios Arweave</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    button { padding: 10px; margin: 5px; }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    button { margin: 5px; padding: 10px; }
+    textarea { width: 100%; height: 80px; margin-bottom: 10px; }
+    #commentLog div { border-bottom: 1px solid #ccc; padding: 5px 0; }
   </style>
 </head>
 <body>
-  <h1>Wander Wallet</h1>
+
+  <h1>Sistema de Comentarios Arweave</h1>
 
   <button id="connectBtn">Conectar Wallet</button>
   <button id="disconnectBtn">Desconectar Wallet</button>
-  <p id="walletAddress">Wallet: No conectada</p>
 
-  <script>
-    let walletAddress = null;
+  <div>
+    <textarea id="commentInput" placeholder="Escribe tu comentario aquí..."></textarea>
+    <button id="sendCommentBtn">Enviar Comentario</button>
+  </div>
 
-    // Esperar a que la API de la wallet esté lista
-    window.addEventListener("arweaveWalletLoaded", () => {
-      console.log("Wander Wallet cargada");
-      console.log(`Wallet: ${window.arweaveWallet.walletName}`);
-      console.log(`Versión: ${window.arweaveWallet.walletVersion}`);
+  <h2>Comentarios Enviados</h2>
+  <div id="commentLog"></div>
+
+  <script type="module">
+    import Arweave from "https://cdn.jsdelivr.net/npm/arweave@1.12.0/dist/web/arweave.min.js";
+
+    const arweave = Arweave.init({
+      host: "arweave.net",
+      port: 443,
+      protocol: "https"
     });
 
-    // Conectar wallet
-    document.getElementById("connectBtn").addEventListener("click", async () => {
-      if (!window.arweaveWallet) {
-        alert("Instala y desbloquea Wander Wallet");
+    let userAddress = null;
+    let userTier = null;
+
+    // Esperar a que Wander cargue
+    window.addEventListener("arweaveWalletLoaded", () => {
+      console.log("Wander API cargada");
+    });
+
+    const connectBtn = document.getElementById("connectBtn");
+    const disconnectBtn = document.getElementById("disconnectBtn");
+    const sendCommentBtn = document.getElementById("sendCommentBtn");
+    const commentInput = document.getElementById("commentInput");
+    const commentLog = document.getElementById("commentLog");
+
+    // Conectar Wallet
+    connectBtn.addEventListener("click", async () => {
+      try {
+        await window.arweaveWallet.connect([
+          "ACCESS_ADDRESS",
+          "SIGN_TRANSACTION",
+          "DISPATCH"
+        ], {
+          name: "Mi Comentario App",
+          logo: "https://example.com/logo.png"
+        });
+
+        userAddress = await window.arweaveWallet.getActiveAddress();
+        const tierInfo = await window.arweaveWallet.getWanderTierInfo();
+        userTier = tierInfo.tier;
+
+        alert(`Wallet conectada: ${userAddress} - Tier: ${userTier}`);
+      } catch (err) {
+        console.error("Error conectando wallet:", err);
+        alert("No se pudo conectar la wallet");
+      }
+    });
+
+    // Desconectar Wallet
+    disconnectBtn.addEventListener("click", async () => {
+      try {
+        await window.arweaveWallet.disconnect();
+        userAddress = null;
+        userTier = null;
+        alert("Wallet desconectada");
+      } catch (err) {
+        console.error("Error desconectando wallet:", err);
+      }
+    });
+
+    // Enviar comentario
+    sendCommentBtn.addEventListener("click", async () => {
+      if (!userAddress) {
+        alert("Conecta tu wallet primero");
+        return;
+      }
+
+      const message = commentInput.value.trim();
+      if (!message) {
+        alert("Escribe un comentario");
         return;
       }
 
       try {
-        await window.arweaveWallet.connect(
-          ["ACCESS_ADDRESS", "SIGN_TRANSACTION"], // permisos
-          { 
-            name: "Sistema de Comentarios", 
-            logo: "https://mi-sitio.com/logo.png" 
-          }, // info de la app
-          { host: "arweave.net", port: 443, protocol: "https" } // gateway
-        );
+        // Crear transacción
+        const tx = await arweave.createTransaction({
+          data: JSON.stringify({
+            user: userAddress,
+            message: message,
+            timestamp: new Date().toISOString(),
+            tier: userTier
+          })
+        });
 
-        walletAddress = await window.arweaveWallet.getActiveAddress();
-        document.getElementById("walletAddress").textContent = "Wallet: " + walletAddress;
-        alert("Wallet conectada: " + walletAddress);
+        tx.addTag("App-Name", "Mi Comentario App");
+        tx.addTag("Type", "Comment");
 
+        // Dispatch
+        const res = await window.arweaveWallet.dispatch(tx);
+
+        // Mostrar comentario
+        commentLog.innerHTML += `
+          <div>
+            <p><b>${userAddress}</b> (${userTier}): ${message}</p>
+            <small>TxID: ${res.id} | Tipo: ${res.type}</small>
+          </div>
+        `;
+
+        commentInput.value = "";
       } catch (err) {
-        console.error(err);
-        alert("Error conectando wallet: " + err.message);
+        console.error("Error enviando comentario:", err);
+        alert("No se pudo enviar el comentario");
       }
-    });
-
-    // Desconectar wallet
-    document.getElementById("disconnectBtn").addEventListener("click", async () => {
-      if (!window.arweaveWallet) return;
-
-      try {
-        await window.arweaveWallet.disconnect();
-        walletAddress = null;
-        document.getElementById("walletAddress").textContent = "Wallet: No conectada";
-        alert("Wallet desconectada");
-      } catch (err) {
-        console.error(err);
-        alert("Error desconectando wallet: " + err.message);
-      }
-    });
-
-    // Detectar cambio de wallet activa
-    window.addEventListener("walletSwitch", (e) => {
-      walletAddress = e.detail.address;
-      document.getElementById("walletAddress").textContent = "Wallet: " + walletAddress;
-      console.log("Usuario cambió de wallet a:", walletAddress);
     });
   </script>
+
 </body>
 </html>
