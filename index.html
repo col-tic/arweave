@@ -2,10 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Sistema de Comentarios Arweave</title>
+  <title>Sistema de Comentarios Arweave2</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
-    button { margin: 5px; padding: 10px; }
+    button { margin: 5px; padding: 10px; cursor: pointer; }
     textarea { width: 100%; height: 80px; margin-bottom: 10px; }
     #commentLog div { border-bottom: 1px solid #ccc; padding: 5px 0; }
   </style>
@@ -34,100 +34,100 @@
       protocol: "https"
     });
 
-    let userAddress = null;
-    let userTier = null;
-
-    // Esperar a que Wander cargue
+    // Esperar a que Wander esté cargado
     window.addEventListener("arweaveWalletLoaded", () => {
-      console.log("Wander API cargada");
+      console.log("Wander API lista");
+      initApp();
     });
 
-    const connectBtn = document.getElementById("connectBtn");
-    const disconnectBtn = document.getElementById("disconnectBtn");
-    const sendCommentBtn = document.getElementById("sendCommentBtn");
-    const commentInput = document.getElementById("commentInput");
-    const commentLog = document.getElementById("commentLog");
+    function initApp() {
+      const connectBtn = document.getElementById("connectBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const sendCommentBtn = document.getElementById("sendCommentBtn");
+      const commentInput = document.getElementById("commentInput");
+      const commentLog = document.getElementById("commentLog");
 
-    // Conectar Wallet
-    connectBtn.addEventListener("click", async () => {
-      try {
-        await window.arweaveWallet.connect([
-          "ACCESS_ADDRESS",
-          "SIGN_TRANSACTION",
-          "DISPATCH"
-        ], {
-          name: "Mi Comentario App",
-          logo: "https://example.com/logo.png"
-        });
+      let userAddress = null;
+      let userTier = null;
 
-        userAddress = await window.arweaveWallet.getActiveAddress();
-        const tierInfo = await window.arweaveWallet.getWanderTierInfo();
-        userTier = tierInfo.tier;
+      // Conectar wallet
+      connectBtn.addEventListener("click", async () => {
+        try {
+          await window.arweaveWallet.connect(
+            ["ACCESS_ADDRESS", "SIGN_TRANSACTION", "DISPATCH"],
+            { name: "Mi Comentario App", logo: "https://example.com/logo.png" }
+          );
 
-        alert(`Wallet conectada: ${userAddress} - Tier: ${userTier}`);
-      } catch (err) {
-        console.error("Error conectando wallet:", err);
-        alert("No se pudo conectar la wallet");
-      }
-    });
+          userAddress = await window.arweaveWallet.getActiveAddress();
+          const tierInfo = await window.arweaveWallet.getWanderTierInfo();
+          userTier = tierInfo.tier;
 
-    // Desconectar Wallet
-    disconnectBtn.addEventListener("click", async () => {
-      try {
-        await window.arweaveWallet.disconnect();
-        userAddress = null;
-        userTier = null;
-        alert("Wallet desconectada");
-      } catch (err) {
-        console.error("Error desconectando wallet:", err);
-      }
-    });
+          alert(`Wallet conectada: ${userAddress} - Tier: ${userTier}`);
+        } catch (err) {
+          console.error("Error conectando wallet:", err);
+          alert("No se pudo conectar la wallet");
+        }
+      });
 
-    // Enviar comentario
-    sendCommentBtn.addEventListener("click", async () => {
-      if (!userAddress) {
-        alert("Conecta tu wallet primero");
-        return;
-      }
+      // Desconectar wallet
+      disconnectBtn.addEventListener("click", async () => {
+        try {
+          await window.arweaveWallet.disconnect();
+          userAddress = null;
+          userTier = null;
+          alert("Wallet desconectada");
+        } catch (err) {
+          console.error("Error desconectando wallet:", err);
+        }
+      });
 
-      const message = commentInput.value.trim();
-      if (!message) {
-        alert("Escribe un comentario");
-        return;
-      }
+      // Enviar comentario
+      sendCommentBtn.addEventListener("click", async () => {
+        if (!userAddress) {
+          alert("Conecta tu wallet primero");
+          return;
+        }
 
-      try {
-        // Crear transacción
-        const tx = await arweave.createTransaction({
-          data: JSON.stringify({
-            user: userAddress,
-            message: message,
-            timestamp: new Date().toISOString(),
-            tier: userTier
-          })
-        });
+        const message = commentInput.value.trim();
+        if (!message) {
+          alert("Escribe un comentario");
+          return;
+        }
 
-        tx.addTag("App-Name", "Mi Comentario App");
-        tx.addTag("Type", "Comment");
+        try {
+          // Crear transacción
+          const tx = await arweave.createTransaction({
+            data: JSON.stringify({
+              user: userAddress,
+              message: message,
+              timestamp: new Date().toISOString(),
+              tier: userTier
+            })
+          });
 
-        // Dispatch
-        const res = await window.arweaveWallet.dispatch(tx);
+          tx.addTag("App-Name", "Mi Comentario App");
+          tx.addTag("Type", "Comment");
 
-        // Mostrar comentario
-        commentLog.innerHTML += `
-          <div>
-            <p><b>${userAddress}</b> (${userTier}): ${message}</p>
-            <small>TxID: ${res.id} | Tipo: ${res.type}</small>
-          </div>
-        `;
+          // Dispatch
+          const res = await window.arweaveWallet.dispatch(tx);
 
-        commentInput.value = "";
-      } catch (err) {
-        console.error("Error enviando comentario:", err);
-        alert("No se pudo enviar el comentario");
-      }
-    });
+          // Mostrar comentario en pantalla
+          commentLog.innerHTML += `
+            <div>
+              <p><b>${userAddress}</b> (${userTier}): ${message}</p>
+              <small>TxID: ${res.id} | Tipo: ${res.type}</small>
+            </div>
+          `;
+
+          commentInput.value = "";
+        } catch (err) {
+          console.error("Error enviando comentario:", err);
+          alert("No se pudo enviar el comentario");
+        }
+      });
+    }
   </script>
 
 </body>
 </html>
+
