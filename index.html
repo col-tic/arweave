@@ -2,24 +2,27 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Comentarios con Wander + Arweave (Respuestas)</title>
+  <title>Comentarios con Wander + Arweave (Respuestas estilo YouTube)</title>
   <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
-    button { margin: 5px; padding: 8px 15px; cursor: pointer; }
+    button { margin: 5px; padding: 6px 12px; cursor: pointer; }
     #comments { margin-top: 20px; }
     .comment { border-bottom: 1px solid #ccc; padding: 10px 0; }
     .txid { font-size: 0.8em; color: gray; }
+    .replyBox { margin-top: 8px; }
+    .replyBox textarea { width: 100%; margin-bottom: 5px; }
     #debug { margin-top: 30px; background: #111; color: #0f0; padding: 10px; font-family: monospace; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <h2>💬 Sistema de Comentarios (con Respuestas + Debug)</h2>
+  <h2>💬 Sistema de Comentarios (Respuestas Estilo YouTube + Debug)</h2>
 
   <button id="connectBtn">Conectar Wallet</button>
   <button id="disconnectBtn">Desconectar Wallet</button>
   <p id="walletAddress"></p>
 
+  <h3>Escribir comentario</h3>
   <textarea id="commentInput" placeholder="Escribe tu comentario..." rows="3" cols="50"></textarea><br>
   <button id="sendCommentBtn">Enviar comentario</button>
 
@@ -75,32 +78,32 @@
       }
     };
 
-    // Enviar comentario (soporta respuestas)
-    async function sendComment(replyTo = "origin") {
-      const text = commentInput.value.trim();
+    // Enviar comentario raíz
+    sendCommentBtn.onclick = () => sendComment("origin", commentInput);
+
+    // Función para enviar comentario o respuesta
+    async function sendComment(replyTo, inputEl) {
+      const text = inputEl.value.trim();
       if (!text) return alert("Escribe un comentario");
 
       try {
         const tx = await arweave.createTransaction({ data: text });
-
         tx.addTag("Content-Type", "text/plain");
         tx.addTag("type", "commentary");
-        tx.addTag("to", replyTo); // raíz o respuesta
+        tx.addTag("to", replyTo);
         tx.addTag("page", window.location.pathname);
 
         const res = await window.arweaveWallet.dispatch(tx);
 
-        logDebug(`📝 Comentario enviado a "${replyTo}" -> TxID: ${res.id}`);
+        logDebug(`📝 Comentario enviado (to=${replyTo}) -> TxID: ${res.id}`);
         alert(`Comentario enviado.\nTxID: ${res.id}`);
 
-        commentInput.value = "";
+        inputEl.value = "";
         loadComments();
       } catch (err) {
         logDebug("❌ Error al enviar comentario: " + err);
       }
     }
-
-    sendCommentBtn.onclick = () => sendComment("origin");
 
     // Cargar comentarios desde Arweave
     async function loadComments() {
@@ -147,21 +150,19 @@
           return;
         }
 
-        // Mapear comentarios por ID y agrupar hijos
+        // Construir mapa de hilos
         const commentsMap = {};
         for (const edge of edges) {
           const node = edge.node;
           const toTag = node.tags.find(t => t.name === "to")?.value || "origin";
-
           commentsMap[node.id] = { node, children: [] };
-
           if (toTag !== "origin") {
             if (!commentsMap[toTag]) commentsMap[toTag] = { children: [] };
             commentsMap[toTag].children.push(node);
           }
         }
 
-        // Renderizar solo los comentarios raíz
+        // Renderizar raíz
         for (const edge of edges) {
           const node = edge.node;
           const toTag = node.tags.find(t => t.name === "to")?.value || "origin";
@@ -175,7 +176,7 @@
       }
     }
 
-    // Renderizar comentario y sus respuestas
+    // Renderizar comentario y respuestas
     async function renderComment(node, container, commentsMap, depth = 0) {
       const text = await fetch(`https://arweave.net/${node.id}`).then(r => r.text());
       const div = document.createElement("div");
@@ -190,20 +191,34 @@
 
       const replyBtn = div.querySelector(".replyBtn");
       replyBtn.onclick = () => {
-        commentInput.value = `@${node.owner.address} `;
-        sendComment(node.id);
+        if (div.querySelector(".replyBox")) return; // evitar duplicados
+
+        const box = document.createElement("div");
+        box.className = "replyBox";
+        box.innerHTML = `
+          <textarea rows="2" placeholder="Escribe tu respuesta..."></textarea><br>
+          <button>Enviar respuesta</button>
+        `;
+
+        const textarea = box.querySelector("textarea");
+        const sendBtn = box.querySelector("button");
+
+        sendBtn.onclick = () => sendComment(node.id, textarea);
+
+        div.appendChild(box);
       };
 
       container.appendChild(div);
 
-      // Renderizar hijos (respuestas)
+      // Renderizar hijos
       for (const child of commentsMap[node.id]?.children || []) {
         await renderComment(child, container, commentsMap, depth + 1);
       }
     }
 
-    // Al cargar la página
+    // Al cargar
     loadComments();
   </script>
 </body>
 </html>
+
