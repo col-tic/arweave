@@ -1,118 +1,92 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Title 1</title>
-
-<meta property="og:image" content="https://example.com/images/video1_thumbnail.jpg" />
-
-<style>
-    body { font-family: 'Courier New', Courier, monospace; background-color: #000; margin: 0; padding: 20px; color: #00FF00; }
-    h1 { text-align: center; margin-bottom: 20px; text-shadow: 0 0 10px #00FF00; }
-    .menu-ribbon { background-color: #222; padding: 10px; text-align: center; border-radius: 5px; margin-bottom: 20px; }
-    .menu-ribbon a { color: #00FF00; text-decoration: none; margin: 0 15px; font-size: 18px; text-shadow: 0 0 5px #00FF00; }
-    .menu-ribbon a:hover { color: #00CC00; }
-    video { width: 100%; max-width: 800px; height: auto; display: block; margin: 0 auto; border: 4px solid #00FF00; }
-    .description-box { background-color: #222; border-radius: 5px; padding: 15px; margin-top: 20px; color: #00FF00; text-shadow: 0 0 5px #00FF00; }
-    .description-box a { color: #00FF00; text-decoration: none; }
-    .description-box a:hover { color: #00CC00; }
-    .comment-box { background-color: #222; border-radius: 5px; padding: 15px; margin-top: 20px; color: #00FF00; text-shadow: 0 0 5px #00FF00; }
-    .comment-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; }
-    .comment { margin-bottom: 10px; }
-    .reply-to-reply { color: #FFA500; text-shadow: 0 0 5px #FFA500,0 0 10px #FFA500,0 0 15px #FF4500; font-style: italic; margin-left: 20px; }
-    .comment-content { font-size: 38px; font-weight: bold; color: #00FF00; }
-</style>
+  <meta charset="UTF-8">
+  <title>Comentarios en Arweave</title>
+  <script src="https://cdn.jsdelivr.net/npm/arweave@1.13.0/dist/arweave.min.js"></script>
+  <!-- Wonder Wallet SDK (ajusta según documentación) -->
+  <script src="https://unpkg.com/@wonder-wallet/sdk/dist/wonder-wallet.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    button { margin: 5px; padding: 10px; }
+    #comments { margin-top: 20px; }
+    .comment { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+  </style>
 </head>
 <body>
+  <h1>Sistema de Comentarios Arweave</h1>
 
-<h1>Video Title 1</h1>
-<div class="menu-ribbon">
-    <a href="#Home">Videos</a>
-    <a href="./about.html">About</a>
-    <a href="./gateways.html">Gateways</a>
-    <a href="./faq.html">FAQ</a>
-    <a href="#Help">Help</a>
-</div>
-<video controls>
-    <source src="2zzzz.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-</video>
+  <div>
+    <button id="connectBtn">Conectar Wallet</button>
+    <button id="disconnectBtn">Desconectar Wallet</button>
+  </div>
 
-<div class="description-box">
-    <h2>Description</h2>
-    <p>This is a brief description of the video.</p>
-    <p>For more information, visit <a href="https://example.com" target="_blank"><u>this link</u></a>.</p>
-</div>
+  <div>
+    <textarea id="commentInput" rows="4" cols="50" placeholder="Escribe tu comentario aquí..."></textarea><br>
+    <button id="sendCommentBtn">Enviar Comentario</button>
+  </div>
 
-<h1>Arweave Data:</h1>
-<div id="resultDisplay">Loading...</div>
+  <div id="comments">
+    <h2>Comentarios</h2>
+    <div id="commentsList"></div>
+  </div>
 
-<div class="comment-box" id="commentBox">
-    <div class="comment-title">Comments</div>
-</div>
+  <script>
+    let wallet = null;
+    const arweave = Arweave.init({
+      host: 'arweave.net',
+      port: 443,
+      protocol: 'https'
+    });
 
-<script>
-let domain = window.location.hostname; // tu dominio principal
-let walletTo = 'BYV27vTsvrHI9vkYudgP_rjhhzBce4GGB2vF87zS5EA';
-let minAmount = 9000000000;
-let whatTransactionPost;
+    document.getElementById('connectBtn').addEventListener('click', async () => {
+      wallet = await WonderWallet.connect();
+      if(wallet) alert('Wallet conectada: ' + wallet.address);
+    });
 
-// Funciones fetch JSON desde dominio normal
-async function fetchFirstJson() {
-    const jsonUrl = `https://${domain}/ar-io/resolver/`;
-    const response = await fetch(jsonUrl);
-    if (!response.ok) throw new Error('Network error fetching first JSON');
-    const data = await response.json();
-    console.log("TxId:", data.txId);
-    return data.txId;
-}
+    document.getElementById('disconnectBtn').addEventListener('click', async () => {
+      await WonderWallet.disconnect();
+      wallet = null;
+      alert('Wallet desconectada');
+    });
 
-async function fetchSecondJson(txId) {
-    const url = `https://${domain}/raw/${txId}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Network error fetching second JSON');
-    return await response.json();
-}
+    document.getElementById('sendCommentBtn').addEventListener('click', async () => {
+      if(!wallet) {
+        alert('Conecta tu wallet primero.');
+        return;
+      }
+      const commentText = document.getElementById('commentInput').value;
+      if(!commentText) return alert('Escribe un comentario.');
 
-function processSecondJson(data) {
-    const searchfor = "2zzzz.mp4";
-    const result = data.paths[searchfor];
-    if(result){
-        console.log(`Value for "${searchfor}":`, result.id);
-        whatTransactionPost = result.id;
-        document.getElementById('resultDisplay').innerText = `Use Arweave hash: ${result.id}`;
-    } else {
-        document.getElementById('resultDisplay').innerText = `"${searchfor}" not found`;
+      try {
+        // Crear transacción
+        let transaction = await arweave.createTransaction({ data: commentText }, wallet);
+        // Metadata básica
+        transaction.addTag('App-Name', 'ArweaveComments');
+        transaction.addTag('Comment-Type', 'text');
+        await arweave.transactions.sign(transaction, wallet);
+        let response = await arweave.transactions.post(transaction);
+
+        if(response.status === 200 || response.status === 202) {
+          const txId = transaction.id;
+          const location = `https://arweave.net/${txId}`;
+          displayComment(commentText, txId, location);
+        } else {
+          alert('Error al enviar comentario.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error: ' + err.message);
+      }
+    });
+
+    function displayComment(text, txId, location) {
+      const div = document.createElement('div');
+      div.className = 'comment';
+      div.innerHTML = `<p>${text}</p><small>TxID: ${txId}</small><br><a href="${location}" target="_blank">Ver en Arweave</a>`;
+      document.getElementById('commentsList').prepend(div);
+      document.getElementById('commentInput').value = '';
     }
-}
-
-function handleError(error) {
-    console.error(error);
-    document.getElementById('resultDisplay').innerText = 'Error fetching data';
-}
-
-// --- Aquí puedes mantener tus funciones de comentarios y replies ---
-// checkForRepliesByTransactionId, checkRepliesToReply, hasTransactions, loadBlocklist, displayComments, fetchTransactionContent
-
-async function checkReplies() {
-    if(whatTransactionPost){
-        await checkForRepliesByTransactionId(whatTransactionPost);
-    } else console.log('No transaction ID available');
-}
-
-async function main() {
-    try {
-        const txId = await fetchFirstJson();
-        const secondData = await fetchSecondJson(txId);
-        processSecondJson(secondData);
-        await checkReplies();
-    } catch(e) { handleError(e); }
-}
-
-main();
-</script>
-
+  </script>
 </body>
 </html>
-
