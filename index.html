@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mi App Arweave - Debug</title>
+<title>Mi App Arweave</title>
 <script src="https://cdn.jsdelivr.net/npm/arweave@1.16.0/bundles/arweave.bundle.min.js"></script>
 <style>
   body { font-family: Arial, sans-serif; padding: 20px; }
-  button { margin: 5px 0; }
-  img { max-width: 200px; margin: 10px; }
+  button { margin: 5px 0; padding: 5px 10px; }
+  img { max-width: 200px; margin: 10px; display: block; }
   .image-card { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-  .log { background: #eee; padding: 10px; margin-top: 10px; max-height: 200px; overflow: auto; }
+  .log { background: #eee; padding: 10px; margin-top: 10px; max-height: 200px; overflow: auto; font-size: 12px; }
 </style>
 </head>
 <body>
 
-<h1>Mi App Arweave - Debug</h1>
+<h1>Mi App Arweave</h1>
 
 <button onclick="connectWallet()">Conectar Wallet</button>
 <p id="wallet-address">Wallet no conectada</p>
@@ -61,16 +61,17 @@ async function connectWallet() {
 }
 
 async function uploadImage() {
+  if (!walletAddress) return alert("Conecta primero la wallet");
+
   const file = document.getElementById('fileInput').files[0];
   if (!file) return alert("Selecciona un archivo");
-  
+
   log("Archivo seleccionado: " + file.name + ", tamaño: " + file.size + " bytes");
 
   const reader = new FileReader();
   reader.onload = async function(event) {
     const arrayBuffer = event.target.result;
-    log("ArrayBuffer cargado, creando transacción...");
-    
+
     const transaction = await arweave.createTransaction({ data: arrayBuffer });
     transaction.addTag('App-Name', 'MiApp');
     transaction.addTag('Type', 'Image');
@@ -78,14 +79,11 @@ async function uploadImage() {
     log("Transacción creada, id temporal: " + transaction.id);
 
     try {
-      log("Firmando transacción...");
       await window.arweaveWallet.sign(transaction);
-      log("Transacción firmada correctamente.");
+      log("Transacción firmada correctamente: " + transaction.isSigned);
 
-      log("Enviando transacción...");
       const response = await arweave.transactions.post(transaction);
       log("Transacción enviada, status: " + response.status);
-
       if (response.status === 200) {
         alert("Imagen subida!");
         log("Imagen subida con ID: " + transaction.id);
@@ -118,17 +116,18 @@ async function loadImages() {
 
     for (const txId of txs.data) {
       try {
-        const txData = await arweave.transactions.getData(txId, {decode: true, string: true});
+        // Usamos URL directa de Arweave
+        const imageUrl = `https://arweave.net/${txId}`;
         const div = document.createElement('div');
         div.className = 'image-card';
         div.innerHTML = `
-          <img src="data:image/*;base64,${btoa(txData)}">
+          <img src="${imageUrl}" alt="Imagen Arweave">
           <p>ID: ${txId}</p>
           <button onclick="replyToImage('${txId}')">Responder</button>
         `;
         container.appendChild(div);
       } catch(e) {
-        log("Error cargando transacción " + txId + ": " + e);
+        log("Error mostrando transacción " + txId + ": " + e);
       }
     }
   } catch(e) {
@@ -137,6 +136,8 @@ async function loadImages() {
 }
 
 async function replyToImage(txId) {
+  if (!walletAddress) return alert("Conecta primero la wallet");
+
   const text = prompt("Escribe tu respuesta:");
   if (!text) return;
 
