@@ -1,224 +1,176 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Comentarios con Wander + Arweave (Respuestas estilo YouTube)</title>
-  <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>Comentarios con hilos</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
-    button { margin: 5px; padding: 6px 12px; cursor: pointer; }
-    #comments { margin-top: 20px; }
-    .comment { border-bottom: 1px solid #ccc; padding: 10px 0; }
-    .txid { font-size: 0.8em; color: gray; }
-    .replyBox { margin-top: 8px; }
-    .replyBox textarea { width: 100%; margin-bottom: 5px; }
-    #debug { margin-top: 30px; background: #111; color: #0f0; padding: 10px; font-family: monospace; white-space: pre-wrap; }
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      background: #f7f7f7;
+    }
+
+    #commentBox {
+      display: flex;
+      margin-bottom: 20px;
+    }
+
+    #newComment {
+      flex: 1;
+      padding: 8px;
+    }
+
+    button {
+      margin-left: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .comment {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 10px;
+      margin: 8px 0;
+    }
+
+    .meta {
+      font-size: 0.8em;
+      color: #555;
+      margin-bottom: 5px;
+    }
+
+    .replies {
+      margin-left: 20px;
+      border-left: 2px solid #ddd;
+      padding-left: 10px;
+    }
+
+    .reply-box {
+      margin-top: 8px;
+      display: flex;
+    }
+
+    .reply-box textarea {
+      flex: 1;
+      padding: 5px;
+    }
   </style>
 </head>
 <body>
-  <h2>💬 Sistema de Comentarios (Respuestas Estilo YouTube + Debug)</h2>
 
-  <button id="connectBtn">Conectar Wallet</button>
-  <button id="disconnectBtn">Desconectar Wallet</button>
-  <p id="walletAddress"></p>
+  <h2>💬 Comentarios estilo Reddit</h2>
 
-  <h3>Escribir comentario</h3>
-  <textarea id="commentInput" placeholder="Escribe tu comentario..." rows="3" cols="50"></textarea><br>
-  <button id="sendCommentBtn">Enviar comentario</button>
+  <!-- Caja para nuevo comentario raíz -->
+  <div id="commentBox">
+    <textarea id="newComment" placeholder="Escribe un comentario..."></textarea>
+    <button onclick="addComment()">Publicar</button>
+  </div>
 
-  <h3>Comentarios</h3>
   <div id="comments"></div>
 
-  <h3>🔎 Debug Log</h3>
-  <div id="debug"></div>
-
   <script>
-    const arweave = Arweave.init({
-      host: "ar-io.net",
-      port: 443,
-      protocol: "https"
-    });
+    // Simulación de comentarios (como si vinieran de Arweave)
+    let comments = [
+      { txId: "root1", text: "Primer comentario raíz", author: "👤 Alice", parentId: null },
+      { txId: "c2", text: "Respuesta al primer comentario", author: "👤 Bob", parentId: "root1" },
+      { txId: "c3", text: "Otra respuesta al primero", author: "👤 Carol", parentId: "root1" },
+      { txId: "c4", text: "Respuesta a la respuesta de Bob", author: "👤 Dave", parentId: "c2" }
+    ];
 
-    const connectBtn = document.getElementById("connectBtn");
-    const disconnectBtn = document.getElementById("disconnectBtn");
-    const sendCommentBtn = document.getElementById("sendCommentBtn");
-    const walletAddressEl = document.getElementById("walletAddress");
-    const commentInput = document.getElementById("commentInput");
-    const commentsDiv = document.getElementById("comments");
-    const debugDiv = document.getElementById("debug");
-
-    let currentAddress = null;
-
-    function logDebug(msg) {
-      console.log(msg);
-      debugDiv.textContent += msg + "\n";
+    // Generar TXID simple (simulación)
+    function generateTxId() {
+      return Math.random().toString(36).substring(2, 15);
     }
 
-    // Conectar wallet
-    connectBtn.onclick = async () => {
-      try {
-        await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
-        currentAddress = await window.arweaveWallet.getActiveAddress();
-        walletAddressEl.textContent = "Conectado: " + currentAddress;
-        logDebug("✅ Wallet conectada: " + currentAddress);
-      } catch (err) {
-        logDebug("❌ Error al conectar: " + err);
-      }
-    };
-
-    // Desconectar wallet
-    disconnectBtn.onclick = async () => {
-      try {
-        await window.arweaveWallet.disconnect();
-        currentAddress = null;
-        walletAddressEl.textContent = "Desconectado";
-        logDebug("ℹ️ Wallet desconectada.");
-      } catch (err) {
-        logDebug("❌ Error al desconectar: " + err);
-      }
-    };
-
-    // Enviar comentario raíz
-    sendCommentBtn.onclick = () => sendComment("origin", commentInput);
-
-    // Función para enviar comentario o respuesta
-    async function sendComment(replyTo, inputEl) {
-      const text = inputEl.value.trim();
-      if (!text) return alert("Escribe un comentario");
-
-      try {
-        const tx = await arweave.createTransaction({ data: text });
-        tx.addTag("Content-Type", "text/plain");
-        tx.addTag("type", "commentary");
-        tx.addTag("to", replyTo);
-        tx.addTag("page", window.location.pathname);
-
-        const res = await window.arweaveWallet.dispatch(tx);
-
-        logDebug(`📝 Comentario enviado (to=${replyTo}) -> TxID: ${res.id}`);
-        alert(`Comentario enviado.\nTxID: ${res.id}`);
-
-        inputEl.value = "";
-        loadComments();
-      } catch (err) {
-        logDebug("❌ Error al enviar comentario: " + err);
-      }
+    // Construir árbol de hilos
+    function buildTree(comments, parentId = null) {
+      return comments
+        .filter(c => c.parentId === parentId)
+        .map(c => ({ ...c, replies: buildTree(comments, c.txId) }));
     }
 
-    // Cargar comentarios desde Arweave
-    async function loadComments() {
-      commentsDiv.innerHTML = "Cargando comentarios...";
-      logDebug("🔄 Cargando comentarios...");
-
-      const query = {
-        query: `
-          query {
-            transactions(
-              tags: [
-                { name: "type", values: ["commentary"] },
-                { name: "page", values: ["${window.location.pathname}"] }
-              ],
-              first: 100,
-              sort: HEIGHT_DESC
-            ) {
-              edges {
-                node {
-                  id
-                  owner { address }
-                  tags { name value }
-                }
-              }
-            }
-          }
-        `
-      };
-
-      try {
-        const response = await fetch("https://arweave.net/graphql", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(query),
-        });
-
-        const result = await response.json();
-        const edges = result.data.transactions.edges;
-
-        commentsDiv.innerHTML = "";
-        if (edges.length === 0) {
-          commentsDiv.textContent = "No hay comentarios todavía.";
-          logDebug("⚠️ No hay comentarios.");
-          return;
-        }
-
-        // Construir mapa de hilos
-        const commentsMap = {};
-        for (const edge of edges) {
-          const node = edge.node;
-          const toTag = node.tags.find(t => t.name === "to")?.value || "origin";
-          commentsMap[node.id] = { node, children: [] };
-          if (toTag !== "origin") {
-            if (!commentsMap[toTag]) commentsMap[toTag] = { children: [] };
-            commentsMap[toTag].children.push(node);
-          }
-        }
-
-        // Renderizar raíz
-        for (const edge of edges) {
-          const node = edge.node;
-          const toTag = node.tags.find(t => t.name === "to")?.value || "origin";
-          if (toTag !== "origin") continue;
-          await renderComment(node, commentsDiv, commentsMap);
-        }
-
-      } catch (err) {
-        logDebug("❌ Error al cargar comentarios: " + err);
-        commentsDiv.textContent = "Error al cargar comentarios.";
-      }
-    }
-
-    // Renderizar comentario y respuestas
-    async function renderComment(node, container, commentsMap, depth = 0) {
-      const text = await fetch(`https://arweave.net/${node.id}`).then(r => r.text());
-      const div = document.createElement("div");
-      div.className = "comment";
-      div.style.marginLeft = `${depth * 20}px`;
-      div.innerHTML = `
-        <p>${text}</p>
-        <p class="txid">👤 ${node.owner.address}<br>
-        TxID: <a href="https://arweave.net/${node.id}" target="_blank">${node.id}</a></p>
-        <button class="replyBtn">↩️ Responder</button>
-      `;
-
-      const replyBtn = div.querySelector(".replyBtn");
-      replyBtn.onclick = () => {
-        if (div.querySelector(".replyBox")) return; // evitar duplicados
-
-        const box = document.createElement("div");
-        box.className = "replyBox";
-        box.innerHTML = `
-          <textarea rows="2" placeholder="Escribe tu respuesta..."></textarea><br>
-          <button>Enviar respuesta</button>
+    // Renderizar árbol de comentarios
+    function renderComments(tree, container) {
+      tree.forEach(comment => {
+        const div = document.createElement("div");
+        div.className = "comment";
+        div.innerHTML = `
+          <div class="meta">
+            ${comment.author} <br>
+            TxID: <a href="https://arweave.net/${comment.txId}" target="_blank">${comment.txId}</a>
+          </div>
+          <div>${comment.text}</div>
+          <button onclick="toggleReplyBox('${comment.txId}')">↩️ Responder</button>
+          <div id="reply-${comment.txId}" class="reply-box" style="display:none;">
+            <textarea id="replyText-${comment.txId}" placeholder="Escribe una respuesta..."></textarea>
+            <button onclick="addReply('${comment.txId}')">Responder</button>
+          </div>
         `;
 
-        const textarea = box.querySelector("textarea");
-        const sendBtn = box.querySelector("button");
+        // contenedor de respuestas
+        const repliesDiv = document.createElement("div");
+        repliesDiv.className = "replies";
+        div.appendChild(repliesDiv);
 
-        sendBtn.onclick = () => sendComment(node.id, textarea);
+        container.appendChild(div);
 
-        div.appendChild(box);
-      };
-
-      container.appendChild(div);
-
-      // Renderizar hijos
-      for (const child of commentsMap[node.id]?.children || []) {
-        await renderComment(child, container, commentsMap, depth + 1);
-      }
+        // renderizar recursivamente las respuestas
+        renderComments(comment.replies, repliesDiv);
+      });
     }
 
-    // Al cargar
-    loadComments();
+    // Mostrar comentarios en pantalla
+    function displayComments() {
+      const container = document.getElementById("comments");
+      container.innerHTML = "";
+      const tree = buildTree(comments);
+      renderComments(tree, container);
+    }
+
+    // Agregar comentario raíz
+    function addComment() {
+      const text = document.getElementById("newComment").value.trim();
+      if (!text) return;
+      const newC = {
+        txId: generateTxId(),
+        text,
+        author: "👤 Usuario",
+        parentId: null
+      };
+      comments.push(newC);
+      console.log("Nuevo comentario:", newC);
+      document.getElementById("newComment").value = "";
+      displayComments();
+    }
+
+    // Mostrar/ocultar caja de respuesta
+    function toggleReplyBox(parentId) {
+      const box = document.getElementById("reply-" + parentId);
+      box.style.display = box.style.display === "none" ? "flex" : "none";
+    }
+
+    // Agregar respuesta a un comentario
+    function addReply(parentId) {
+      const textArea = document.getElementById("replyText-" + parentId);
+      const text = textArea.value.trim();
+      if (!text) return;
+      const newReply = {
+        txId: generateTxId(),
+        text,
+        author: "👤 Usuario",
+        parentId
+      };
+      comments.push(newReply);
+      console.log("Nueva respuesta:", newReply);
+      textArea.value = "";
+      displayComments();
+    }
+
+    // Render inicial
+    displayComments();
   </script>
 </body>
 </html>
+
 
