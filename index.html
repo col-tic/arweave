@@ -9,6 +9,7 @@
     button { margin: 5px; padding: 8px 15px; cursor: pointer; }
     #comments { margin-top: 20px; }
     .comment { border-bottom: 1px solid #ccc; padding: 10px 0; }
+    .reply { margin-left: 30px; border-left: 2px solid #ddd; padding-left: 10px; }
     .txid { font-size: 0.8em; color: gray; }
   </style>
 </head>
@@ -63,7 +64,7 @@
       }
     };
 
-    // Enviar comentario
+    // Enviar comentario (directo al "origin")
     sendCommentBtn.onclick = async () => {
       const text = commentInput.value.trim();
       if (!text) return alert("Escribe un comentario");
@@ -74,31 +75,29 @@
         // Etiquetas para identificarlo como comentario
         tx.addTag("Content-Type", "text/plain");
         tx.addTag("type", "commentary");
-        tx.addTag("to", "origin"); // por ahora todos van a origin
+        tx.addTag("to", "origin"); // comentario directo
         tx.addTag("page", window.location.pathname);
 
         const res = await window.arweaveWallet.dispatch(tx);
 
         console.log("Comentario enviado:", res);
-        alert(`Comentario enviado.\nTxID: ${res.id} | type: ${res.type}`);
+        alert(`Comentario enviado.\nTxID: ${res.id}`);
         commentInput.value = "";
-        loadComments(); // recargar lista
+        loadComments();
       } catch (err) {
         console.error("Error al enviar comentario:", err);
       }
     };
 
-    // Cargar comentarios desde Arweave GraphQL
-    async function loadComments() {
-      commentsDiv.innerHTML = "Cargando comentarios...";
-
+    // Consultar comentarios con GraphQL
+    async function queryComments(toValue) {
       const query = {
         query: `
           query {
             transactions(
               tags: [
                 { name: "type", values: ["commentary"] },
-                { name: "to", values: ["origin"] },
+                { name: "to", values: ["${toValue}"] },
                 { name: "page", values: ["${window.location.pathname}"] }
               ],
               first: 50,
@@ -108,7 +107,6 @@
                 node {
                   id
                   owner { address }
-                  tags { name value }
                 }
               }
             }
@@ -116,36 +114,40 @@
         `
       };
 
-      try {
-        const response = await fetch("https://arweave.net/graphql", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(query),
-        });
+      const response = await fetch("https://arweave.net/graphql", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(query),
+      });
 
-        const result = await response.json();
-        const edges = result.data.transactions.edges;
+      const result = await response.json();
+      return result.data.transactions.edges;
+    }
 
-        commentsDiv.innerHTML = "";
-        if (edges.length === 0) {
-          commentsDiv.textContent = "No hay comentarios todavía.";
-          return;
-        }
+    // Renderizar comentarios + respuestas
+    async function renderComments(toValue, container, isReply = false) {
+      const edges = await queryComments(toValue);
 
-        for (const edge of edges) {
-          const commentText = await fetch(`https://arweave.net/${edge.node.id}`).then(r => r.text());
-          const div = document.createElement("div");
-          div.className = "comment";
-          div.innerHTML = `
-            <p>${commentText}</p>
-            <p class="txid">👤 ${edge.node.owner.address}<br>TxID: ${edge.node.id}</p>
-          `;
-          commentsDiv.appendChild(div);
-        }
-      } catch (err) {
-        console.error("Error al cargar comentarios:", err);
-        commentsDiv.textContent = "Error al cargar comentarios.";
+      for (const edge of edges) {
+        const commentText = await fetch(`https://arweave.net/${edge.node.id}`).then(r => r.text());
+        const div = document.createElement("div");
+        div.className = isReply ? "comment reply" : "comment";
+        div.innerHTML = `
+          <p>${commentText}</p>
+          <p class="txid">👤 ${edge.node.owner.address}<br>TxID: ${edge.node.id}</p>
+        `;
+        container.appendChild(div);
+
+        // Buscar respuestas a este comentario
+        await renderComments(edge.node.id, div, true);
       }
+    }
+
+    // Cargar todos los comentarios
+    async function loadComments() {
+      commentsDiv.innerHTML = "Cargando comentarios...";
+      commentsDiv.innerHTML = "";
+      await renderComments("origin", commentsDiv);
     }
 
     // Al cargar la página
