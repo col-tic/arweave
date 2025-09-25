@@ -1,220 +1,118 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Artube - Mi App Arweave</title>
-<script src="https://cdn.jsdelivr.net/npm/arweave@1.16.0/bundles/arweave.bundle.min.js"></script>
+<title>Video Title 1</title>
+
+<meta property="og:image" content="https://example.com/images/video1_thumbnail.jpg" />
+
 <style>
-  body { font-family: Arial, sans-serif; padding: 20px; }
-  button { margin: 5px 0; padding: 5px 10px; }
-  img { max-width: 200px; margin: 10px 0; display: block; }
-  .image-card { border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; }
-  .reply { margin-left: 20px; font-size: 14px; background: #f4f4f4; padding: 5px; }
-  .log { background: #eee; padding: 10px; margin-top: 10px; max-height: 200px; overflow: auto; font-size: 12px; }
+    body { font-family: 'Courier New', Courier, monospace; background-color: #000; margin: 0; padding: 20px; color: #00FF00; }
+    h1 { text-align: center; margin-bottom: 20px; text-shadow: 0 0 10px #00FF00; }
+    .menu-ribbon { background-color: #222; padding: 10px; text-align: center; border-radius: 5px; margin-bottom: 20px; }
+    .menu-ribbon a { color: #00FF00; text-decoration: none; margin: 0 15px; font-size: 18px; text-shadow: 0 0 5px #00FF00; }
+    .menu-ribbon a:hover { color: #00CC00; }
+    video { width: 100%; max-width: 800px; height: auto; display: block; margin: 0 auto; border: 4px solid #00FF00; }
+    .description-box { background-color: #222; border-radius: 5px; padding: 15px; margin-top: 20px; color: #00FF00; text-shadow: 0 0 5px #00FF00; }
+    .description-box a { color: #00FF00; text-decoration: none; }
+    .description-box a:hover { color: #00CC00; }
+    .comment-box { background-color: #222; border-radius: 5px; padding: 15px; margin-top: 20px; color: #00FF00; text-shadow: 0 0 5px #00FF00; }
+    .comment-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; }
+    .comment { margin-bottom: 10px; }
+    .reply-to-reply { color: #FFA500; text-shadow: 0 0 5px #FFA500,0 0 10px #FFA500,0 0 15px #FF4500; font-style: italic; margin-left: 20px; }
+    .comment-content { font-size: 38px; font-weight: bold; color: #00FF00; }
 </style>
 </head>
 <body>
 
-<h1>Artube - Mi App Arweave</h1>
+<h1>Video Title 1</h1>
+<div class="menu-ribbon">
+    <a href="#Home">Videos</a>
+    <a href="./about.html">About</a>
+    <a href="./gateways.html">Gateways</a>
+    <a href="./faq.html">FAQ</a>
+    <a href="#Help">Help</a>
+</div>
+<video controls>
+    <source src="2zzzz.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+</video>
 
-<button onclick="connectWallet()">Conectar Wallet</button>
-<button onclick="disconnectWallet()">Desconectar Wallet</button>
-<p id="wallet-address">Wallet no conectada</p>
+<div class="description-box">
+    <h2>Description</h2>
+    <p>This is a brief description of the video.</p>
+    <p>For more information, visit <a href="https://example.com" target="_blank"><u>this link</u></a>.</p>
+</div>
 
-<h2>Subir imagen</h2>
-<input type="file" id="fileInput" accept="image/*">
-<button onclick="uploadImage()">Subir</button>
+<h1>Arweave Data:</h1>
+<div id="resultDisplay">Loading...</div>
 
-<h2>Imágenes publicadas</h2>
-<div id="imagesContainer"></div>
-
-<h2>Debug log</h2>
-<div id="log" class="log"></div>
+<div class="comment-box" id="commentBox">
+    <div class="comment-title">Comments</div>
+</div>
 
 <script>
-const arweave = Arweave.init({ host: 'arweave.net', port: 443, protocol: 'https' });
-let walletAddress = null;
+let domain = window.location.hostname; // tu dominio principal
+let walletTo = 'BYV27vTsvrHI9vkYudgP_rjhhzBce4GGB2vF87zS5EA';
+let minAmount = 9000000000;
+let whatTransactionPost;
 
-function log(message) {
-  const logDiv = document.getElementById('log');
-  const p = document.createElement('p');
-  p.textContent = message;
-  logDiv.appendChild(p);
-  console.log(message);
+// Funciones fetch JSON desde dominio normal
+async function fetchFirstJson() {
+    const jsonUrl = `https://${domain}/ar-io/resolver/`;
+    const response = await fetch(jsonUrl);
+    if (!response.ok) throw new Error('Network error fetching first JSON');
+    const data = await response.json();
+    console.log("TxId:", data.txId);
+    return data.txId;
 }
 
-async function connectWallet() {
-  log("Intentando conectar wallet...");
-  if (window.arweaveWallet) {
+async function fetchSecondJson(txId) {
+    const url = `https://${domain}/raw/${txId}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Network error fetching second JSON');
+    return await response.json();
+}
+
+function processSecondJson(data) {
+    const searchfor = "2zzzz.mp4";
+    const result = data.paths[searchfor];
+    if(result){
+        console.log(`Value for "${searchfor}":`, result.id);
+        whatTransactionPost = result.id;
+        document.getElementById('resultDisplay').innerText = `Use Arweave hash: ${result.id}`;
+    } else {
+        document.getElementById('resultDisplay').innerText = `"${searchfor}" not found`;
+    }
+}
+
+function handleError(error) {
+    console.error(error);
+    document.getElementById('resultDisplay').innerText = 'Error fetching data';
+}
+
+// --- Aquí puedes mantener tus funciones de comentarios y replies ---
+// checkForRepliesByTransactionId, checkRepliesToReply, hasTransactions, loadBlocklist, displayComments, fetchTransactionContent
+
+async function checkReplies() {
+    if(whatTransactionPost){
+        await checkForRepliesByTransactionId(whatTransactionPost);
+    } else console.log('No transaction ID available');
+}
+
+async function main() {
     try {
-      await window.arweaveWallet.connect(['ACCESS_ADDRESS','SIGN_TRANSACTION']);
-      walletAddress = await window.arweaveWallet.getActiveAddress();
-      document.getElementById('wallet-address').innerText = "Wallet conectada: " + walletAddress;
-      log("Wallet conectada: " + walletAddress);
-      loadImages();
-    } catch(e) {
-      log("Error conectando wallet: " + e);
-    }
-  } else {
-    alert("Instala ArConnect para continuar.");
-    log("ArConnect no encontrado.");
-  }
+        const txId = await fetchFirstJson();
+        const secondData = await fetchSecondJson(txId);
+        processSecondJson(secondData);
+        await checkReplies();
+    } catch(e) { handleError(e); }
 }
 
-async function disconnectWallet() {
-  if (window.arweaveWallet) {
-    try {
-      await window.arweaveWallet.disconnect();
-      walletAddress = null;
-      document.getElementById('wallet-address').innerText = "Wallet desconectada";
-      log("Wallet desconectada.");
-      document.getElementById('imagesContainer').innerHTML = '';
-    } catch(e) {
-      log("Error desconectando wallet: " + e);
-    }
-  }
-}
-
-async function uploadImage() {
-  if (!walletAddress) return alert("Conecta primero la wallet");
-
-  const file = document.getElementById('fileInput').files[0];
-  if (!file) return alert("Selecciona un archivo");
-
-  log("Archivo seleccionado: " + file.name + ", tamaño: " + file.size + " bytes");
-
-  const reader = new FileReader();
-  reader.onload = async function(event) {
-    const arrayBuffer = event.target.result;
-
-    const transaction = await arweave.createTransaction({ data: arrayBuffer });
-    transaction.addTag('App-Name', 'artube');       // clave de tu sitio
-    transaction.addTag('Type', 'Image');
-    transaction.addTag('Content-Type', file.type);  // MIME correcto
-    transaction.addTag('Uploader', walletAddress);  // solo tu wallet
-
-    log("Transacción creada, id temporal: " + transaction.id);
-
-    try {
-      await window.arweaveWallet.sign(transaction);
-      log("Transacción firmada correctamente: " + transaction.isSigned);
-
-      const response = await arweave.transactions.post(transaction);
-      log("Transacción enviada, status: " + response.status);
-      if (response.status === 200) {
-        alert("Imagen subida!");
-        log("Imagen subida con ID: " + transaction.id);
-        loadImages();
-      } else {
-        alert("Error al subir: " + response.statusText);
-        log("Error enviando transacción: " + response.status + " - " + response.statusText);
-      }
-    } catch(e) {
-      log("Error durante la firma o envío: " + e);
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-async function loadImages() {
-  if (!walletAddress) return;
-  log("Cargando imágenes publicadas de tu wallet...");
-  const query = {
-    op: "and",
-    expr1: { op: "equals", expr1: "App-Name", expr2: "artube" },
-    expr2: { op: "equals", expr1: "Uploader", expr2: walletAddress }
-  };
-  try {
-    const txs = await arweave.api.post('/arql', query);
-    const container = document.getElementById('imagesContainer');
-    container.innerHTML = '';
-    log("Transacciones encontradas: " + (txs.data ? txs.data.length : 0));
-
-    if (!txs.data || txs.data.length === 0) return container.innerText = "No hay imágenes";
-
-    for (const txId of txs.data) {
-      try {
-        const imageUrl = `https://arweave.net/${txId}`;
-        const div = document.createElement('div');
-        div.className = 'image-card';
-        div.innerHTML = `
-          <img src="${imageUrl}" alt="Imagen Arweave">
-          <p>ID: ${txId}</p>
-          <button onclick="replyToImage('${txId}')">Responder</button>
-          <div id="replies-${txId}"></div>
-        `;
-        container.appendChild(div);
-        loadReplies(txId);
-      } catch(e) {
-        log("Error mostrando transacción " + txId + ": " + e);
-      }
-    }
-  } catch(e) {
-    log("Error consultando transacciones: " + e);
-  }
-}
-
-async function replyToImage(txId) {
-  if (!walletAddress) return alert("Conecta primero la wallet");
-
-  const text = prompt("Escribe tu respuesta:");
-  if (!text) return;
-
-  const transaction = await arweave.createTransaction({ data: text });
-  transaction.addTag('App-Name', 'artube');       // clave de tu sitio
-  transaction.addTag('Type', 'Reply');
-  transaction.addTag('Reply-To', txId);
-  transaction.addTag('Uploader', walletAddress);  // solo tu wallet
-
-  try {
-    log("Firmando respuesta...");
-    await window.arweaveWallet.sign(transaction);
-    log("Respuesta firmada, id: " + transaction.id);
-
-    const response = await arweave.transactions.post(transaction);
-    log("Respuesta enviada, status: " + response.status);
-    if (response.status === 200) {
-      alert("Respuesta enviada!");
-      loadReplies(txId);
-    } else alert("Error al enviar: " + response.statusText);
-  } catch(e) {
-    log("Error enviando respuesta: " + e);
-  }
-}
-
-async function loadReplies(txId) {
-  const repliesContainer = document.getElementById(`replies-${txId}`);
-  repliesContainer.innerHTML = '';
-  const query = {
-    op: "and",
-    expr1: { op: "equals", expr1: "App-Name", expr2: "artube" },
-    expr2: { op: "and",
-      expr1: { op: "equals", expr1: "Type", expr2: "Reply" },
-      expr2: { op: "equals", expr1: "Reply-To", expr2: txId }
-    }
-  };
-  try {
-    const txs = await arweave.api.post('/arql', query);
-    if (!txs.data || txs.data.length === 0) return;
-    for (const replyId of txs.data) {
-      try {
-        const replyTx = await arweave.transactions.get(replyId);
-        if (replyTx.owner !== walletAddress) continue; // solo replies de tu wallet
-        const replyData = await arweave.transactions.getData(replyId, {decode: true, string: true});
-        const div = document.createElement('div');
-        div.className = 'reply';
-        div.textContent = replyData;
-        repliesContainer.appendChild(div);
-      } catch(e) {
-        log("Error cargando respuesta " + replyId + ": " + e);
-      }
-    }
-  } catch(e) {
-    log("Error consultando respuestas: " + e);
-  }
-}
+main();
 </script>
 
 </body>
 </html>
+
