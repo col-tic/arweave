@@ -89,9 +89,10 @@ async function uploadImage() {
     const arrayBuffer = event.target.result;
 
     const transaction = await arweave.createTransaction({ data: arrayBuffer });
-    transaction.addTag('App-Name', 'artube');  // Clave de tu sitio
+    transaction.addTag('App-Name', 'artube');       // clave de tu sitio
     transaction.addTag('Type', 'Image');
-    transaction.addTag('Content-Type', file.type); // MIME correcto
+    transaction.addTag('Content-Type', file.type);  // MIME correcto
+    transaction.addTag('Uploader', walletAddress);  // solo tu wallet
 
     log("Transacción creada, id temporal: " + transaction.id);
 
@@ -117,11 +118,12 @@ async function uploadImage() {
 }
 
 async function loadImages() {
-  log("Cargando imágenes publicadas...");
+  if (!walletAddress) return;
+  log("Cargando imágenes publicadas de tu wallet...");
   const query = {
     op: "and",
     expr1: { op: "equals", expr1: "App-Name", expr2: "artube" },
-    expr2: { op: "equals", expr1: "Type", expr2: "Image" }
+    expr2: { op: "equals", expr1: "Uploader", expr2: walletAddress }
   };
   try {
     const txs = await arweave.api.post('/arql', query);
@@ -160,9 +162,10 @@ async function replyToImage(txId) {
   if (!text) return;
 
   const transaction = await arweave.createTransaction({ data: text });
-  transaction.addTag('App-Name', 'artube');  // Clave de tu sitio
+  transaction.addTag('App-Name', 'artube');       // clave de tu sitio
   transaction.addTag('Type', 'Reply');
   transaction.addTag('Reply-To', txId);
+  transaction.addTag('Uploader', walletAddress);  // solo tu wallet
 
   try {
     log("Firmando respuesta...");
@@ -196,6 +199,8 @@ async function loadReplies(txId) {
     if (!txs.data || txs.data.length === 0) return;
     for (const replyId of txs.data) {
       try {
+        const replyTx = await arweave.transactions.get(replyId);
+        if (replyTx.owner !== walletAddress) continue; // solo replies de tu wallet
         const replyData = await arweave.transactions.getData(replyId, {decode: true, string: true});
         const div = document.createElement('div');
         div.className = 'reply';
