@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mi App Arweave</title>
+<title>Artube - Mi App Arweave</title>
 <script src="https://cdn.jsdelivr.net/npm/arweave@1.16.0/bundles/arweave.bundle.min.js"></script>
 <style>
   body { font-family: Arial, sans-serif; padding: 20px; }
@@ -16,9 +16,10 @@
 </head>
 <body>
 
-<h1>Mi App Arweave</h1>
+<h1>Artube - Mi App Arweave</h1>
 
 <button onclick="connectWallet()">Conectar Wallet</button>
+<button onclick="disconnectWallet()">Desconectar Wallet</button>
 <p id="wallet-address">Wallet no conectada</p>
 
 <h2>Subir imagen</h2>
@@ -61,6 +62,20 @@ async function connectWallet() {
   }
 }
 
+async function disconnectWallet() {
+  if (window.arweaveWallet) {
+    try {
+      await window.arweaveWallet.disconnect();
+      walletAddress = null;
+      document.getElementById('wallet-address').innerText = "Wallet desconectada";
+      log("Wallet desconectada.");
+      document.getElementById('imagesContainer').innerHTML = '';
+    } catch(e) {
+      log("Error desconectando wallet: " + e);
+    }
+  }
+}
+
 async function uploadImage() {
   if (!walletAddress) return alert("Conecta primero la wallet");
 
@@ -74,9 +89,9 @@ async function uploadImage() {
     const arrayBuffer = event.target.result;
 
     const transaction = await arweave.createTransaction({ data: arrayBuffer });
-    transaction.addTag('App-Name', 'MiApp');
+    transaction.addTag('App-Name', 'artube');  // Clave de tu sitio
     transaction.addTag('Type', 'Image');
-    transaction.addTag('Content-Type', file.type); // Importante para mostrar la imagen correctamente
+    transaction.addTag('Content-Type', file.type); // MIME correcto
 
     log("Transacción creada, id temporal: " + transaction.id);
 
@@ -105,7 +120,7 @@ async function loadImages() {
   log("Cargando imágenes publicadas...");
   const query = {
     op: "and",
-    expr1: { op: "equals", expr1: "App-Name", expr2: "MiApp" },
+    expr1: { op: "equals", expr1: "App-Name", expr2: "artube" },
     expr2: { op: "equals", expr1: "Type", expr2: "Image" }
   };
   try {
@@ -145,7 +160,7 @@ async function replyToImage(txId) {
   if (!text) return;
 
   const transaction = await arweave.createTransaction({ data: text });
-  transaction.addTag('App-Name', 'MiApp');
+  transaction.addTag('App-Name', 'artube');  // Clave de tu sitio
   transaction.addTag('Type', 'Reply');
   transaction.addTag('Reply-To', txId);
 
@@ -170,7 +185,7 @@ async function loadReplies(txId) {
   repliesContainer.innerHTML = '';
   const query = {
     op: "and",
-    expr1: { op: "equals", expr1: "App-Name", expr2: "MiApp" },
+    expr1: { op: "equals", expr1: "App-Name", expr2: "artube" },
     expr2: { op: "and",
       expr1: { op: "equals", expr1: "Type", expr2: "Reply" },
       expr2: { op: "equals", expr1: "Reply-To", expr2: txId }
@@ -198,5 +213,3 @@ async function loadReplies(txId) {
 
 </body>
 </html>
-
-
