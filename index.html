@@ -3,18 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mi App Arweave</title>
+<title>Mi App Arweave - Debug</title>
 <script src="https://cdn.jsdelivr.net/npm/arweave@1.16.0/bundles/arweave.bundle.min.js"></script>
 <style>
   body { font-family: Arial, sans-serif; padding: 20px; }
   button { margin: 5px 0; }
   img { max-width: 200px; margin: 10px; }
   .image-card { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+  .log { background: #eee; padding: 10px; margin-top: 10px; max-height: 200px; overflow: auto; }
 </style>
 </head>
 <body>
 
-<h1>Mi App Arweave</h1>
+<h1>Mi App Arweave - Debug</h1>
 
 <button onclick="connectWallet()">Conectar Wallet</button>
 <p id="wallet-address">Wallet no conectada</p>
@@ -26,18 +27,36 @@
 <h2>Imágenes publicadas</h2>
 <div id="imagesContainer"></div>
 
+<h2>Debug log</h2>
+<div id="log" class="log"></div>
+
 <script>
 const arweave = Arweave.init({ host: 'arweave.net', port: 443, protocol: 'https' });
 let walletAddress = null;
 
+function log(message) {
+  const logDiv = document.getElementById('log');
+  const p = document.createElement('p');
+  p.textContent = message;
+  logDiv.appendChild(p);
+  console.log(message);
+}
+
 async function connectWallet() {
+  log("Intentando conectar wallet...");
   if (window.arweaveWallet) {
-    await window.arweaveWallet.connect(['ACCESS_ADDRESS','SIGN_TRANSACTION']);
-    walletAddress = await window.arweaveWallet.getActiveAddress();
-    document.getElementById('wallet-address').innerText = "Wallet conectada: " + walletAddress;
-    loadImages();
+    try {
+      await window.arweaveWallet.connect(['ACCESS_ADDRESS','SIGN_TRANSACTION']);
+      walletAddress = await window.arweaveWallet.getActiveAddress();
+      document.getElementById('wallet-address').innerText = "Wallet conectada: " + walletAddress;
+      log("Wallet conectada: " + walletAddress);
+      loadImages();
+    } catch(e) {
+      log("Error conectando wallet: " + e);
+    }
   } else {
     alert("Instala ArConnect para continuar.");
+    log("ArConnect no encontrado.");
   }
 }
 
@@ -45,43 +64,75 @@ async function uploadImage() {
   const file = document.getElementById('fileInput').files[0];
   if (!file) return alert("Selecciona un archivo");
   
-  const data = await file.arrayBuffer();
-  const transaction = await arweave.createTransaction({ data });
-  transaction.addTag('App-Name', 'MiApp');
-  transaction.addTag('Type', 'Image');
+  log("Archivo seleccionado: " + file.name + ", tamaño: " + file.size + " bytes");
 
-  await window.arweaveWallet.sign(transaction);
-  const response = await arweave.transactions.post(transaction);
-  if (response.status === 200) {
-    alert("Imagen subida!");
-    loadImages();
-  } else {
-    alert("Error al subir: " + response.statusText);
-  }
+  const reader = new FileReader();
+  reader.onload = async function(event) {
+    const arrayBuffer = event.target.result;
+    log("ArrayBuffer cargado, creando transacción...");
+    
+    const transaction = await arweave.createTransaction({ data: arrayBuffer });
+    transaction.addTag('App-Name', 'MiApp');
+    transaction.addTag('Type', 'Image');
+
+    log("Transacción creada, id temporal: " + transaction.id);
+
+    try {
+      log("Firmando transacción...");
+      await window.arweaveWallet.sign(transaction);
+      log("Transacción firmada correctamente.");
+
+      log("Enviando transacción...");
+      const response = await arweave.transactions.post(transaction);
+      log("Transacción enviada, status: " + response.status);
+
+      if (response.status === 200) {
+        alert("Imagen subida!");
+        log("Imagen subida con ID: " + transaction.id);
+        loadImages();
+      } else {
+        alert("Error al subir: " + response.statusText);
+        log("Error enviando transacción: " + response.status + " - " + response.statusText);
+      }
+    } catch(e) {
+      log("Error durante la firma o envío: " + e);
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 async function loadImages() {
+  log("Cargando imágenes publicadas...");
   const query = {
     op: "and",
     expr1: { op: "equals", expr1: "App-Name", expr2: "MiApp" },
     expr2: { op: "equals", expr1: "Type", expr2: "Image" }
   };
-  const txs = await arweave.api.post('/arql', query);
-  const container = document.getElementById('imagesContainer');
-  container.innerHTML = '';
+  try {
+    const txs = await arweave.api.post('/arql', query);
+    const container = document.getElementById('imagesContainer');
+    container.innerHTML = '';
+    log("Transacciones encontradas: " + (txs.data ? txs.data.length : 0));
 
-  if (!txs.data || txs.data.length === 0) return container.innerText = "No hay imágenes";
+    if (!txs.data || txs.data.length === 0) return container.innerText = "No hay imágenes";
 
-  for (const txId of txs.data) {
-    const txData = await arweave.transactions.getData(txId, {decode: true, string: true});
-    const div = document.createElement('div');
-    div.className = 'image-card';
-    div.innerHTML = `
-      <img src="data:image/*;base64,${btoa(txData)}">
-      <p>ID: ${txId}</p>
-      <button onclick="replyToImage('${txId}')">Responder</button>
-    `;
-    container.appendChild(div);
+    for (const txId of txs.data) {
+      try {
+        const txData = await arweave.transactions.getData(txId, {decode: true, string: true});
+        const div = document.createElement('div');
+        div.className = 'image-card';
+        div.innerHTML = `
+          <img src="data:image/*;base64,${btoa(txData)}">
+          <p>ID: ${txId}</p>
+          <button onclick="replyToImage('${txId}')">Responder</button>
+        `;
+        container.appendChild(div);
+      } catch(e) {
+        log("Error cargando transacción " + txId + ": " + e);
+      }
+    }
+  } catch(e) {
+    log("Error consultando transacciones: " + e);
   }
 }
 
@@ -94,15 +145,21 @@ async function replyToImage(txId) {
   transaction.addTag('Type', 'Reply');
   transaction.addTag('Reply-To', txId);
 
-  await window.arweaveWallet.sign(transaction);
-  const response = await arweave.transactions.post(transaction);
-  if (response.status === 200) {
-    alert("Respuesta enviada!");
-  } else {
-    alert("Error al enviar: " + response.statusText);
+  try {
+    log("Firmando respuesta...");
+    await window.arweaveWallet.sign(transaction);
+    log("Respuesta firmada, id: " + transaction.id);
+
+    const response = await arweave.transactions.post(transaction);
+    log("Respuesta enviada, status: " + response.status);
+    if (response.status === 200) alert("Respuesta enviada!");
+    else alert("Error al enviar: " + response.statusText);
+  } catch(e) {
+    log("Error enviando respuesta: " + e);
   }
 }
 </script>
 
 </body>
 </html>
+
