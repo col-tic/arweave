@@ -2,12 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Comentarios en Arweave</title>
+  <title>Comentarios Arweave con Wonder</title>
   <script src="https://cdn.jsdelivr.net/npm/arweave@1.13.0/dist/arweave.min.js"></script>
-  <!-- Wonder Wallet SDK (ajusta según documentación) -->
   <script src="https://unpkg.com/@wonder-wallet/sdk/dist/wonder-wallet.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
+    body { font-family: Arial; margin: 20px; }
     button { margin: 5px; padding: 10px; }
     #comments { margin-top: 20px; }
     .comment { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
@@ -19,6 +18,7 @@
   <div>
     <button id="connectBtn">Conectar Wallet</button>
     <button id="disconnectBtn">Desconectar Wallet</button>
+    <p id="walletAddress">Wallet: No conectada</p>
   </div>
 
   <div>
@@ -32,40 +32,57 @@
   </div>
 
   <script>
-    let wallet = null;
     const arweave = Arweave.init({
       host: 'arweave.net',
       port: 443,
       protocol: 'https'
     });
 
-    document.getElementById('connectBtn').addEventListener('click', async () => {
-      wallet = await WonderWallet.connect();
-      if(wallet) alert('Wallet conectada: ' + wallet.address);
-    });
+    let wallet = null;
 
-    document.getElementById('disconnectBtn').addEventListener('click', async () => {
-      await WonderWallet.disconnect();
-      wallet = null;
-      alert('Wallet desconectada');
-    });
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const walletAddressEl = document.getElementById('walletAddress');
 
-    document.getElementById('sendCommentBtn').addEventListener('click', async () => {
-      if(!wallet) {
-        alert('Conecta tu wallet primero.');
-        return;
+    // Conectar wallet
+    connectBtn.addEventListener('click', async () => {
+      try {
+        wallet = await WonderWallet.connect();
+        if(wallet) {
+          walletAddressEl.textContent = `Wallet: ${wallet.address}`;
+          alert('Wallet conectada: ' + wallet.address);
+        }
+      } catch(err) {
+        console.error(err);
+        alert('Error al conectar wallet. Revisa si Wonder Wallet está instalada y desbloqueada.');
       }
+    });
+
+    // Desconectar wallet
+    disconnectBtn.addEventListener('click', async () => {
+      if(!wallet) return alert('Wallet no conectada');
+      try {
+        await WonderWallet.disconnect();
+        wallet = null;
+        walletAddressEl.textContent = 'Wallet: No conectada';
+        alert('Wallet desconectada');
+      } catch(err) {
+        console.error(err);
+      }
+    });
+
+    // Enviar comentario
+    document.getElementById('sendCommentBtn').addEventListener('click', async () => {
+      if(!wallet) return alert('Conecta tu wallet primero');
       const commentText = document.getElementById('commentInput').value;
-      if(!commentText) return alert('Escribe un comentario.');
+      if(!commentText) return alert('Escribe un comentario');
 
       try {
-        // Crear transacción
-        let transaction = await arweave.createTransaction({ data: commentText }, wallet);
-        // Metadata básica
+        const transaction = await arweave.createTransaction({ data: commentText }, wallet);
         transaction.addTag('App-Name', 'ArweaveComments');
         transaction.addTag('Comment-Type', 'text');
         await arweave.transactions.sign(transaction, wallet);
-        let response = await arweave.transactions.post(transaction);
+        const response = await arweave.transactions.post(transaction);
 
         if(response.status === 200 || response.status === 202) {
           const txId = transaction.id;
@@ -74,9 +91,9 @@
         } else {
           alert('Error al enviar comentario.');
         }
-      } catch (err) {
+      } catch(err) {
         console.error(err);
-        alert('Error: ' + err.message);
+        alert('Error al enviar comentario: ' + err.message);
       }
     });
 
