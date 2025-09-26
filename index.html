@@ -2,199 +2,39 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Comentarios con hilos (Arweave + Debug)</title>
-  <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; background:#f9f9f9; }
-    button { margin: 5px; padding: 6px 12px; cursor: pointer; }
-    textarea { width: 100%; padding: 8px; }
-    .comment { border: 1px solid #ccc; border-radius: 6px; background:white; padding: 10px; margin: 10px 0; }
-    .txid { font-size: 0.8em; color: gray; }
-    .replies { margin-left: 20px; border-left: 2px solid #ddd; padding-left: 10px; }
-    .reply-box { margin-top: 8px; display: none; }
-    #debug { margin-top: 30px; background: #111; color: #0f0; padding: 10px; font-family: monospace; white-space: pre-wrap; }
-  </style>
+  <title>Prueba Wompi</title>
 </head>
 <body>
-  <h2>💬 Comentarios con hilos</h2>
-
-  <button id="connectBtn">Conectar Wallet</button>
-  <button id="disconnectBtn">Desconectar Wallet</button>
-  <p id="walletAddress"></p>
-
-  <textarea id="commentInput" placeholder="Escribe un comentario raíz..." rows="3"></textarea><br>
-  <button id="sendCommentBtn">Enviar comentario</button>
-
-  <h3>Comentarios</h3>
-  <div id="comments"></div>
-
-  <h3>🔎 Debug Log</h3>
-  <div id="debug"></div>
+  <h1>Botón de prueba con Wompi</h1>
+  <button id="btnPagar">Pagar $5.000</button>
 
   <script>
-    const arweave = Arweave.init({
-      host: "ar-io.net",
-      port: 443,
-      protocol: "https"
-    });
-
-    const connectBtn = document.getElementById("connectBtn");
-    const disconnectBtn = document.getElementById("disconnectBtn");
-    const sendCommentBtn = document.getElementById("sendCommentBtn");
-    const walletAddressEl = document.getElementById("walletAddress");
-    const commentInput = document.getElementById("commentInput");
-    const commentsDiv = document.getElementById("comments");
-    const debugDiv = document.getElementById("debug");
-
-    let currentAddress = null;
-
-    function logDebug(msg) {
-      console.log(msg);
-      debugDiv.textContent += msg + "\n";
-    }
-
-    // Conectar wallet
-    connectBtn.onclick = async () => {
+    document.getElementById("btnPagar").addEventListener("click", async () => {
       try {
-        await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
-        currentAddress = await window.arweaveWallet.getActiveAddress();
-        walletAddressEl.textContent = "Conectado: " + currentAddress;
-        logDebug("✅ Wallet conectada: " + currentAddress);
-      } catch (err) {
-        logDebug("❌ Error al conectar: " + err);
-      }
-    };
-
-    // Desconectar wallet
-    disconnectBtn.onclick = async () => {
-      try {
-        await window.arweaveWallet.disconnect();
-        currentAddress = null;
-        walletAddressEl.textContent = "Desconectado";
-        logDebug("ℹ️ Wallet desconectada.");
-      } catch (err) {
-        logDebug("❌ Error al desconectar: " + err);
-      }
-    };
-
-    // Enviar comentario raíz
-    sendCommentBtn.onclick = async () => {
-      await sendComment(commentInput.value.trim(), "root");
-      commentInput.value = "";
-    };
-
-    async function sendComment(text, parentId) {
-      if (!text) return alert("Escribe un comentario");
-      try {
-        const tx = await arweave.createTransaction({ data: text });
-        tx.addTag("Content-Type", "text/plain");
-        tx.addTag("type", "commentary");
-        tx.addTag("page", window.location.pathname);
-        tx.addTag("parent", parentId);
-
-        const res = await window.arweaveWallet.dispatch(tx);
-        logDebug("📝 Enviado comentario -> TxID: " + res.id + " | parent: " + parentId);
-        loadComments();
-      } catch (err) {
-        logDebug("❌ Error al enviar: " + err);
-      }
-    }
-
-    // Renderizar un árbol de comentarios
-    function renderTree(comments, parentId, container) {
-      comments.filter(c => c.parent === parentId).forEach(c => {
-        const div = document.createElement("div");
-        div.className = "comment";
-        div.innerHTML = `
-          <p>${c.text}</p>
-          <p class="txid">👤 ${c.owner}<br>
-          TxID: <a href="https://arweave.net/${c.id}" target="_blank">${c.id}</a></p>
-          <button onclick="toggleReplyBox('${c.id}')">↩️ Responder</button>
-          <div class="reply-box" id="reply-${c.id}">
-            <textarea id="replyText-${c.id}" rows="2" placeholder="Escribe una respuesta..."></textarea>
-            <button onclick="submitReply('${c.id}')">Responder</button>
-          </div>
-        `;
-        const repliesDiv = document.createElement("div");
-        repliesDiv.className = "replies";
-        div.appendChild(repliesDiv);
-        container.appendChild(div);
-        renderTree(comments, c.id, repliesDiv);
-      });
-    }
-
-    function toggleReplyBox(id) {
-      const box = document.getElementById("reply-" + id);
-      box.style.display = box.style.display === "none" ? "block" : "none";
-    }
-
-    async function submitReply(parentId) {
-      const text = document.getElementById("replyText-" + parentId).value.trim();
-      if (!text) return;
-      await sendComment(text, parentId);
-    }
-
-    // Cargar comentarios
-    async function loadComments() {
-      commentsDiv.innerHTML = "Cargando comentarios...";
-      logDebug("🔄 Cargando comentarios...");
-
-      const query = {
-        query: `
-          query {
-            transactions(
-              tags: [
-                { name: "type", values: ["commentary"] },
-                { name: "page", values: ["${window.location.pathname}"] }
-              ],
-              first: 100,
-              sort: HEIGHT_ASC
-            ) {
-              edges {
-                node {
-                  id
-                  owner { address }
-                  tags { name value }
-                }
-              }
-            }
-          }
-        `
-      };
-
-      try {
-        const response = await fetch("https://arweave.net/graphql", {
+        const response = await fetch("https://backend-coltic.vercel.app/api/transaction", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(query),
+          body: JSON.stringify({
+            amount_in_cents: 500000, // $5.000 COP en centavos
+            currency: "COP",
+            customer_email: "cliente@correo.com",
+            payment_method: {
+              type: "CARD",
+              // ⚠️ Token de prueba de tarjeta en Wompi Sandbox
+              token: "tok_test_visa_4242"
+            }
+          })
         });
-        const result = await response.json();
-        const edges = result.data.transactions.edges;
 
-        const comments = [];
-        for (const edge of edges) {
-          const text = await fetch(`https://arweave.net/${edge.node.id}`).then(r => r.text());
-          const parentTag = edge.node.tags.find(t => t.name === "parent");
-          comments.push({
-            id: edge.node.id,
-            text,
-            owner: edge.node.owner.address,
-            parent: parentTag ? parentTag.value : "root"
-          });
-        }
-
-        commentsDiv.innerHTML = "";
-        renderTree(comments, "root", commentsDiv);
-        logDebug("✅ Comentarios cargados: " + comments.length);
+        const data = await response.json();
+        console.log("Respuesta de Wompi:", data);
+        alert("Respuesta recibida, revisa la consola del navegador.");
       } catch (err) {
-        logDebug("❌ Error al cargar: " + err);
-        commentsDiv.textContent = "Error al cargar comentarios.";
+        console.error("Error:", err);
+        alert("Error en la transacción, revisa consola.");
       }
-    }
-
-    loadComments();
+    });
   </script>
 </body>
 </html>
-
 
