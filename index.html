@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Prueba de pago Wompi Sandbox</title>
+  <title>Prueba de pago Wompi Sandbox2</title>
 </head>
 <body>
   <h1>Comprar Producto (Sandbox)</h1>
@@ -27,7 +27,7 @@
       const buyerEmail = document.getElementById("buyerEmail").value;
 
       try {
-        const res = await fetch("<TU_FUNCTION_URL>", {
+        const res = await fetch("https://unvwxhttpluunfpdmmde.supabase.co/functions/v1/create-payment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ productoId, cantidad, buyerEmail })
