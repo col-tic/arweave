@@ -2,53 +2,94 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Tienda Básica</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .producto { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-    .stock { font-weight: bold; color: green; }
-  </style>
+  <title>Tienda con Strapi</title>
 </head>
 <body>
-  <h1>Productos disponibles</h1>
-  <div id="productos">Cargando productos...</div>
+  <h1>Tienda</h1>
+  <div id="productos"></div>
+  <hr>
+  <h2>Carrito</h2>
+  <ul id="carrito"></ul>
+  <button id="confirmar">Confirmar compra</button>
 
   <script>
-    const apiURL = 'http://localhost:1337/api/productos?populate=*';
+    const API_URL = "http://localhost:1337/api";
+
+    let carrito = [];
 
     async function cargarProductos() {
-      const productosContainer = document.getElementById('productos');
-      productosContainer.innerHTML = '';
+      const res = await fetch(`${API_URL}/productos`);
+      const data = await res.json();
 
-      try {
-        const response = await fetch(apiURL);
-        const data = await response.json();
+      const cont = document.getElementById("productos");
+      cont.innerHTML = "";
 
-        if (!data.data || data.data.length === 0) {
-          productosContainer.innerHTML = 'No hay productos disponibles.';
-          return;
-        }
-
-        data.data.forEach(item => {
-          const producto = item.attributes; // acceder a los campos correctos
-          const div = document.createElement('div');
-          div.className = 'producto';
-          div.innerHTML = `
-            <h2>${producto.nombre}</h2>
-            <p>Alias: ${producto.alias}</p>
-            <p>Precio: $${producto.precio}</p>
-            <p class="stock">Stock disponible: ${producto.stock}</p>
-          `;
-          productosContainer.appendChild(div);
-        });
-
-      } catch (error) {
-        console.error('Error al cargar productos:', error);
-        productosContainer.innerHTML = 'Error al cargar productos.';
-      }
+      data.data.forEach(prod => {
+        const div = document.createElement("div");
+        div.innerHTML = `
+          <h3>${prod.attributes.nombre}</h3>
+          <p>Precio: $${prod.attributes.precio}</p>
+          <p>Stock: ${prod.attributes.stock}</p>
+          <input type="number" min="1" max="${prod.attributes.stock}" value="1" id="qty-${prod.id}">
+          <button onclick="agregarAlCarrito(${prod.id}, '${prod.attributes.nombre}', ${prod.attributes.precio})">Agregar</button>
+        `;
+        cont.appendChild(div);
+      });
     }
 
-    // Cargar productos al inicio
+    function agregarAlCarrito(id, nombre, precio) {
+      const qty = parseInt(document.getElementById(`qty-${id}`).value);
+      carrito.push({ producto: id, nombre, precio, cantidad: qty });
+      renderCarrito();
+    }
+
+    function renderCarrito() {
+      const ul = document.getElementById("carrito");
+      ul.innerHTML = "";
+      carrito.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = `${item.nombre} x${item.cantidad} = $${item.precio * item.cantidad}`;
+        ul.appendChild(li);
+      });
+    }
+
+    document.getElementById("confirmar").addEventListener("click", async () => {
+      if (carrito.length === 0) return alert("Carrito vacío");
+
+      const total = carrito.reduce((acc, item) => acc + item.precio * item.cantidad, 0);
+
+      const pedido = {
+        data: {
+          cliente_email: "cliente@correo.com",
+          total: total,
+          estado: "exitoso",
+          fecha: new Date().toISOString(),
+          metodo_pago: "wompi",
+          items_pedidos: carrito.map(item => ({
+            cantidad: item.cantidad,
+            precio_unitario: item.precio,
+            producto: item.producto
+          }))
+        }
+      };
+
+      try {
+        const res = await fetch(`${API_URL}/pedidos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pedido)
+        });
+        const result = await res.json();
+        console.log("Pedido creado:", result);
+        alert("Compra realizada con éxito!");
+        carrito = [];
+        renderCarrito();
+        cargarProductos(); // recargar stock visible
+      } catch (err) {
+        console.error("Error al enviar pedido:", err);
+      }
+    });
+
     cargarProductos();
   </script>
 </body>
