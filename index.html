@@ -1,6 +1,3 @@
-
-
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,19 +6,17 @@
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-    // Configura tu cliente Supabase
     const supabase = createClient(
       'https://unvwxhttpluunfpdmmde.supabase.co', // tu URL real
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVudnd4aHR0cGx1dW5mcGRtbWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NzYyNDgsImV4cCI6MjA3NDE1MjI0OH0.z4WwcpWUtXyqN-eq56JneJyBF9DGu1-NYIVkmK-j7tQ'
     );
-    // Función global para el botón
+
     window.comprar = async () => {
       const productoId = Number(document.getElementById("productoId").value);
       const cantidad = Number(document.getElementById("cantidad").value);
       const buyerEmail = document.getElementById("buyerEmail").value;
 
       try {
-        // Llamada a la Edge Function
         const { data, error } = await supabase.functions.invoke('create-payment', {
           body: { productoId, cantidad, buyerEmail }
         });
@@ -31,7 +26,6 @@
           return;
         }
 
-        // Redirige al checkout de Wompi
         if (data?.data?.checkout_url) {
           window.location.href = data.data.checkout_url;
         } else {
