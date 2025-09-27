@@ -2,14 +2,13 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Pago Wompi Sandbox4</title>
+  <title>Pago Wompi Sandbox</title>
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-    // Configura tu cliente Supabase con la URL pública y ANON key
     const supabase = createClient(
-      'https://unvwxhttpluunfpdmmde.supabase.co',   // tu URL Supabase
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVudnd4aHR0cGx1dW5mcGRtbWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NzYyNDgsImV4cCI6MjA3NDE1MjI0OH0.z4WwcpWUtXyqN-eq56JneJyBF9DGu1-NYIVkmK-j7tQ'                        // tu anon key
+      'https://<TU_PROYECTO>.supabase.co',   // tu URL Supabase
+      '<TU_ANON_KEY>'                        // tu anon key
     );
 
     async function comprar() {
@@ -18,7 +17,6 @@
       const buyerEmail = document.getElementById("buyerEmail").value;
 
       try {
-        // Invocando la Edge Function desde JS
         const { data, error } = await supabase.functions.invoke('create-payment', {
           body: { productoId, cantidad, buyerEmail }
         });
