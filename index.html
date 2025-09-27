@@ -2,55 +2,49 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Pago Wompi Sandbox</title>
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-
-    const supabase = createClient(
-      'https://unvwxhttpluunfpdmmde.supabase.co', // tu URL real
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVudnd4aHR0cGx1dW5mcGRtbWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NzYyNDgsImV4cCI6MjA3NDE1MjI0OH0.z4WwcpWUtXyqN-eq56JneJyBF9DGu1-NYIVkmK-j7tQ'
-    );
-
-    window.comprar = async () => {
-      const productoId = Number(document.getElementById("productoId").value);
-      const cantidad = Number(document.getElementById("cantidad").value);
-      const buyerEmail = document.getElementById("buyerEmail").value;
-
-      try {
-        const { data, error } = await supabase.functions.invoke('create-payment', {
-          body: { productoId, cantidad, buyerEmail }
-        });
-
-        if (error) {
-          alert("Error: " + error.message);
-          return;
-        }
-
-        if (data?.data?.checkout_url) {
-          window.location.href = data.data.checkout_url;
-        } else {
-          console.log("Respuesta Wompi:", data);
-          alert("Pago iniciado, revisa la consola.");
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Error al llamar la función.");
-      }
-    }
-  </script>
+  <title>Tienda Básica</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .producto { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+    .stock { font-weight: bold; }
+  </style>
 </head>
 <body>
-  <h1>Comprar Producto (Sandbox)</h1>
+  <h1>Productos disponibles</h1>
+  <div id="productos"></div>
 
-  <label for="productoId">ID del producto:</label>
-  <input type="number" id="productoId" value="1" min="1"><br><br>
+  <script>
+    // URL de la API de Strapi
+    const apiURL = 'http://localhost:1337/api/productos?populate=*';
 
-  <label for="cantidad">Cantidad:</label>
-  <input type="number" id="cantidad" value="1" min="1"><br><br>
+    async function cargarProductos() {
+      try {
+        const response = await fetch(apiURL);
+        const data = await response.json();
 
-  <label for="buyerEmail">Email del comprador:</label>
-  <input type="email" id="buyerEmail" value="cliente@example.com"><br><br>
+        const productosContainer = document.getElementById('productos');
+        productosContainer.innerHTML = '';
 
-  <button onclick="comprar()">Comprar</button>
+        data.data.forEach(item => {
+          const producto = item.attributes;
+          const div = document.createElement('div');
+          div.className = 'producto';
+          div.innerHTML = `
+            <h2>${producto.nombre}</h2>
+            <p>Alias: ${producto.alias}</p>
+            <p>Precio: $${producto.precio}</p>
+            <p class="stock">Stock disponible: ${producto.stock}</p>
+          `;
+          productosContainer.appendChild(div);
+        });
+
+      } catch (error) {
+        console.error('Error al cargar productos:', error);
+      }
+    }
+
+    // Cargar productos al inicio
+    cargarProductos();
+  </script>
 </body>
 </html>
