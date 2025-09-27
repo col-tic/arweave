@@ -1,41 +1,52 @@
+
+
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Pago</title>
-<script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+  <title>Pago Wompi Sandbox</title>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-  const supabase = createClient(
-    'https://unvwxhttpluunfpdmmde.supabase.co', // tu URL real
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVudnd4aHR0cGx1dW5mcGRtbWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NzYyNDgsImV4cCI6MjA3NDE1MjI0OH0.z4WwcpWUtXyqN-eq56JneJyBF9DGu1-NYIVkmK-j7tQ'
-  );
-  window.comprar = async () => {
-    const productoId = Number(document.getElementById("productoId").value);
-    const cantidad = Number(document.getElementById("cantidad").value);
-    const buyerEmail = document.getElementById("buyerEmail").value;
-  
-    try {
-      const { data, error } = await supabase.functions.invoke('create-payment', {
-        body: { productoId, cantidad, buyerEmail }
-      });
-  
-      if (error) { alert(error.message); return; }
-  
-      if (data?.data?.checkout_url) {
-        window.location.href = data.data.checkout_url;
-      } else {
-        console.log("Respuesta Wompi:", data);
+    // Configura tu cliente Supabase
+    const supabase = createClient(
+      'https://unvwxhttpluunfpdmmde.supabase.co', // tu URL real
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVudnd4aHR0cGx1dW5mcGRtbWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NzYyNDgsImV4cCI6MjA3NDE1MjI0OH0.z4WwcpWUtXyqN-eq56JneJyBF9DGu1-NYIVkmK-j7tQ'
+    );
+    // Función global para el botón
+    window.comprar = async () => {
+      const productoId = Number(document.getElementById("productoId").value);
+      const cantidad = Number(document.getElementById("cantidad").value);
+      const buyerEmail = document.getElementById("buyerEmail").value;
+
+      try {
+        // Llamada a la Edge Function
+        const { data, error } = await supabase.functions.invoke('create-payment', {
+          body: { productoId, cantidad, buyerEmail }
+        });
+
+        if (error) {
+          alert("Error: " + error.message);
+          return;
+        }
+
+        // Redirige al checkout de Wompi
+        if (data?.data?.checkout_url) {
+          window.location.href = data.data.checkout_url;
+        } else {
+          console.log("Respuesta Wompi:", data);
+          alert("Pago iniciado, revisa la consola.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error al llamar la función.");
       }
-    } catch (err) {
-      console.error(err);
-      alert("Error llamando la función.");
     }
-  }
-</script>
+  </script>
 </head>
 <body>
-  <h1>Comprar Producto33 (Sandbox)</h1>
+  <h1>Comprar Producto (Sandbox)</h1>
 
   <label for="productoId">ID del producto:</label>
   <input type="number" id="productoId" value="1" min="1"><br><br>
@@ -49,5 +60,3 @@
   <button onclick="comprar()">Comprar</button>
 </body>
 </html>
-
-
