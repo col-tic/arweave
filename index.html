@@ -6,27 +6,31 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     .producto { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-    .stock { font-weight: bold; }
+    .stock { font-weight: bold; color: green; }
   </style>
 </head>
 <body>
   <h1>Productos disponibles</h1>
-  <div id="productos"></div>
+  <div id="productos">Cargando productos...</div>
 
   <script>
-    // URL de la API de Strapi
     const apiURL = 'http://localhost:1337/api/productos?populate=*';
 
     async function cargarProductos() {
+      const productosContainer = document.getElementById('productos');
+      productosContainer.innerHTML = '';
+
       try {
         const response = await fetch(apiURL);
         const data = await response.json();
 
-        const productosContainer = document.getElementById('productos');
-        productosContainer.innerHTML = '';
+        if (!data.data || data.data.length === 0) {
+          productosContainer.innerHTML = 'No hay productos disponibles.';
+          return;
+        }
 
         data.data.forEach(item => {
-          const producto = item.attributes;
+          const producto = item.attributes; // acceder a los campos correctos
           const div = document.createElement('div');
           div.className = 'producto';
           div.innerHTML = `
@@ -40,6 +44,7 @@
 
       } catch (error) {
         console.error('Error al cargar productos:', error);
+        productosContainer.innerHTML = 'Error al cargar productos.';
       }
     }
 
