@@ -2,10 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Prueba Wompi + Supabase</title>
+  <title>Prueba de pago Wompi Sandbox</title>
 </head>
 <body>
-  <h1>Probar pago Wompi</h1>
+  <h1>Comprar Producto (Sandbox)</h1>
 
   <label for="productoId">ID del producto:</label>
   <input type="number" id="productoId" value="1" min="1"><br><br>
@@ -27,27 +27,35 @@
       const buyerEmail = document.getElementById("buyerEmail").value;
 
       try {
-        const res = await fetch("/functions/create-payment", {
+        const res = await fetch("<TU_FUNCTION_URL>", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ productoId, cantidad, buyerEmail })
         });
 
-        const data = await res.json();
-        console.log("Respuesta de Wompi:", data);
+        if (!res.ok) {
+          const errorData = await res.json();
+          alert("Error: " + (errorData.error || "No se pudo procesar el pago"));
+          return;
+        }
 
-        if (data.data && data.data.status === "PENDING") {
-          alert("Pago iniciado correctamente. Revisa la consola para la URL de pago.");
+        const data = await res.json();
+
+        // Redirige automáticamente al checkout de Wompi Sandbox
+        if (data.data && data.data.checkout_url) {
+          window.location.href = data.data.checkout_url;
         } else {
-          alert("Error al iniciar el pago. Revisa la consola.");
+          console.log("Respuesta de Wompi:", data);
+          alert("Pago iniciado, revisa la consola para más información.");
         }
 
       } catch (err) {
         console.error(err);
-        alert("Error en la petición al servidor.");
+        alert("Error al conectar con la función del servidor.");
       }
     });
   </script>
 </body>
 </html>
+
 
