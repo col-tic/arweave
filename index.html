@@ -10,39 +10,32 @@
     'https://unvwxhttpluunfpdmmde.supabase.co', // tu URL real
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVudnd4aHR0cGx1dW5mcGRtbWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NzYyNDgsImV4cCI6MjA3NDE1MjI0OH0.z4WwcpWUtXyqN-eq56JneJyBF9DGu1-NYIVkmK-j7tQ'
   );
-
-  // Definir la función en window para que onclick la encuentre
-  window.comprar = async function() {
+  window.comprar = async () => {
     const productoId = Number(document.getElementById("productoId").value);
     const cantidad = Number(document.getElementById("cantidad").value);
     const buyerEmail = document.getElementById("buyerEmail").value;
-
+  
     try {
       const { data, error } = await supabase.functions.invoke('create-payment', {
         body: { productoId, cantidad, buyerEmail }
       });
-
-      if (error) {
-        alert("Error: " + error.message);
-        return;
-      }
-
+  
+      if (error) { alert(error.message); return; }
+  
       if (data?.data?.checkout_url) {
         window.location.href = data.data.checkout_url;
       } else {
-        console.log("Respuesta de Wompi:", data);
-        alert("Pago iniciado, revisa la consola.");
+        console.log("Respuesta Wompi:", data);
       }
     } catch (err) {
       console.error(err);
-      alert("Error al llamar la función.");
+      alert("Error llamando la función.");
     }
   }
 </script>
-
 </head>
 <body>
-  <h1>Comprar Producto (Sandbox)</h1>
+  <h1>Comprar Producto33 (Sandbox)</h1>
 
   <label for="productoId">ID del producto:</label>
   <input type="number" id="productoId" value="1" min="1"><br><br>
