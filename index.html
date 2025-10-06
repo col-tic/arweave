@@ -51,6 +51,19 @@
             /* Neon glow effect */
         }
 
+        button {
+            background: none;
+            color: #37006b;
+            text-decoration: none; /* Remove underline */
+            margin: 0 15px; /* Space between links */
+            font-size: 18px; /* Font size for links */
+            border: none;
+            text-shadow: 0 0 5px #37006b;
+            font-family: 'Courier New', Courier, monospace;
+            cursor: pointer;
+        }
+
+
         .menu-ribbon a:hover {
             color: #00CC00;
             /* Slightly darker green on hover */
@@ -155,59 +168,57 @@
     <a href="./gateways.html">Gateways</a>
     <a href="./faq.html">FAQ</a>
     <a href="#Help">Help</a>
-
-    <!-- 🔸 Botón profesional de conexión -->
-    <button id="walletBtn" class="wallet-btn">Connect Wallet</button>
+    <button id="wanderBtn" class="wander-btn">Connect to Wander</button>
   </div>
 </header>
 
-
 <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
 <script>
-  const walletBtn = document.getElementById("walletBtn");
+  const wanderBtn = document.getElementById("wanderBtn");
   let currentAddress = null;
 
-  // ✅ Verificar si existe Wander o ArConnect
-  function checkWallet() {
+  // ✅ Verificar si Wander está disponible
+  function checkWander() {
     if (!window.arweaveWallet) {
-      alert("❗ No se detecta Wander o ArConnect. Instala la extensión.");
+      alert("❗ No se detecta Wander. Instala la extensión desde la Chrome Web Store.");
       return false;
     }
     return true;
   }
 
-  async function connectWallet() {
-    if (!checkWallet()) return;
+  async function connectWander() {
+    if (!checkWander()) return;
 
     try {
       await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
       currentAddress = await window.arweaveWallet.getActiveAddress();
-      const shortAddr = currentAddress.slice(0, 6) + "..." + currentAddress.slice(-4);
-      walletBtn.textContent = shortAddr;
-      walletBtn.classList.add("connected");
-      console.log("✅ Connected:", currentAddress);
+      wanderBtn.textContent = "Disconnect";
+      wanderBtn.classList.add("connected");
+      console.log("✅ Connected to Wander:", currentAddress);
     } catch (err) {
       console.error("Connection error:", err);
+      alert("Error connecting: " + err.message);
     }
   }
 
-  async function disconnectWallet() {
+  async function disconnectWander() {
     try {
       await window.arweaveWallet.disconnect();
       currentAddress = null;
-      walletBtn.textContent = "Connect Wallet";
-      walletBtn.classList.remove("connected");
-      console.log("🔌 Disconnected");
+      wanderBtn.textContent = "Connect to Wander";
+      wanderBtn.classList.remove("connected");
+      console.log("🔌 Disconnected from Wander");
     } catch (err) {
       console.error("Disconnect error:", err);
     }
   }
 
-  walletBtn.addEventListener("click", () => {
-    if (currentAddress) disconnectWallet();
-    else connectWallet();
+  wanderBtn.addEventListener("click", () => {
+    if (currentAddress) disconnectWander();
+    else connectWander();
   });
 </script>
+
 
 <main>
 
