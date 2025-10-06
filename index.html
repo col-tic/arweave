@@ -1,96 +1,617 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <title>Tienda con Strapi</title>
-</head>
-<body>
-  <h1>Tienda</h1>
-  <div id="productos"></div>
-  <hr>
-  <h2>Carrito</h2>
-  <ul id="carrito"></ul>
-  <button id="confirmar">Confirmar compra</button>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Title 1</title>
 
-  <script>
-    const API_URL = "http://localhost:1337/api";
+    <!-- Thumbnail metadata for RSS feed -->
+    <meta property="og:image" content="https://example.com/images/video1_thumbnail.jpg" />
 
-    let carrito = [];
-
-    async function cargarProductos() {
-      const res = await fetch(`${API_URL}/productos`);
-      const data = await res.json();
-
-      const cont = document.getElementById("productos");
-      cont.innerHTML = "";
-
-      data.data.forEach(prod => {
-        const div = document.createElement("div");
-        div.innerHTML = `
-          <h3>${prod.attributes.nombre}</h3>
-          <p>Precio: $${prod.attributes.precio}</p>
-          <p>Stock: ${prod.attributes.stock}</p>
-          <input type="number" min="1" max="${prod.attributes.stock}" value="1" id="qty-${prod.id}">
-          <button onclick="agregarAlCarrito(${prod.id}, '${prod.attributes.nombre}', ${prod.attributes.precio})">Agregar</button>
-        `;
-        cont.appendChild(div);
-      });
-    }
-
-    function agregarAlCarrito(id, nombre, precio) {
-      const qty = parseInt(document.getElementById(`qty-${id}`).value);
-      carrito.push({ producto: id, nombre, precio, cantidad: qty });
-      renderCarrito();
-    }
-
-    function renderCarrito() {
-      const ul = document.getElementById("carrito");
-      ul.innerHTML = "";
-      carrito.forEach(item => {
-        const li = document.createElement("li");
-        li.textContent = `${item.nombre} x${item.cantidad} = $${item.precio * item.cantidad}`;
-        ul.appendChild(li);
-      });
-    }
-
-    document.getElementById("confirmar").addEventListener("click", async () => {
-      if (carrito.length === 0) return alert("Carrito vacío");
-
-      const total = carrito.reduce((acc, item) => acc + item.precio * item.cantidad, 0);
-
-      const pedido = {
-        data: {
-          cliente_email: "cliente@correo.com",
-          total: total,
-          estado: "exitoso",
-          fecha: new Date().toISOString(),
-          metodo_pago: "wompi",
-          items_pedidos: carrito.map(item => ({
-            cantidad: item.cantidad,
-            precio_unitario: item.precio,
-            producto: item.producto
-          }))
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            /* Monospace font for hacker look */
+            background-color: #000;
+            /* Black background */
+            margin: 0;
+            padding: 20px;
+            color: #00FF00;
+            /* Neon green text color */
         }
-      };
 
-      try {
-        const res = await fetch(`${API_URL}/pedidos`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(pedido)
-        });
-        const result = await res.json();
-        console.log("Pedido creado:", result);
-        alert("Compra realizada con éxito!");
-        carrito = [];
-        renderCarrito();
-        cargarProductos(); // recargar stock visible
-      } catch (err) {
-        console.error("Error al enviar pedido:", err);
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00FF00;
+            /* Neon glow effect */
+        }
+
+        .menu-ribbon {
+            background-color: #222;
+            /* Dark gray background for the ribbon */
+            padding: 10px;
+            text-align: center;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            /* Space between ribbon and video */
+        }
+
+        .menu-ribbon a {
+            color: #00FF00;
+            /* Neon green text color */
+            text-decoration: none;
+            /* Remove underline */
+            margin: 0 15px;
+            /* Space between links */
+            font-size: 18px;
+            /* Font size for links */
+            text-shadow: 0 0 5px #00FF00;
+            /* Neon glow effect */
+        }
+
+        .menu-ribbon a:hover {
+            color: #00CC00;
+            /* Slightly darker green on hover */
+        }
+
+        video {
+            width: 100%;
+            max-width: 800px;
+            /* Maximum width for the video */
+            height: auto;
+            display: block;
+            margin: 0 auto;
+            /* Center the video */
+            border: 4px solid #00FF00;
+            /* Neon green border */
+        }
+
+        .description-box {
+            background-color: #222;
+            /* Dark gray background for the description box */
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            /* Space above the description box */
+            color: #00FF00;
+            /* Neon green text color */
+            text-shadow: 0 0 5px #00FF00;
+            /* Neon glow effect */
+        }
+
+        .description-box a {
+            color: #00FF00;
+            /* Neon green text color for links */
+            text-decoration: none;
+            /* Remove underline */
+        }
+
+        .description-box a:hover {
+            color: #00CC00;
+            /* Slightly darker green on hover */
+        }
+
+        .comment-box {
+            background-color: #222;
+            /* Dark gray background for the comment box */
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            /* Space above the comment box */
+            color: #00FF00;
+            /* Neon green text color */
+            text-shadow: 0 0 5px #00FF00;
+            /* Neon glow effect */
+        }
+
+        .comment-title {
+            font-size: 20px;
+            /* Title font size */
+            font-weight: bold;
+            margin-bottom: 10px;
+            /* Space below the title */
+        }
+
+        .comment {
+            margin-bottom: 10px;
+            /* Space between comments */
+        }
+
+        .reply-to-reply {
+            color: #FFA500;
+            /* Bright orange text color */
+            text-shadow:
+                0 0 5px #FFA500,
+                /* Orange glow */
+                0 0 10px #FFA500,
+                /* Stronger glow */
+                0 0 15px #FF4500;
+            /* Slightly darker orange for depth */
+            font-style: italic;
+            /* Optional: make it italic for differentiation */
+            margin-left: 20px;
+            /* Optional: indent to show it's a reply */
+        }
+
+        .comment-content {
+            font-size: 38px;
+            /* Adjust the size as needed */
+            font-weight: bold;
+            /* Optional: make it bold */
+            color: #00FF00;
+            /* Optional: change color if desired */
+        }
+    </style>
+</head>
+
+<body>
+<header>
+  <h1>Video Title 1</h1>
+  <div class="menu-ribbon">
+    <a href="#Home">Videos</a>
+    <a href="./about.html">About</a>
+    <a href="./gateways.html">Gateways</a>
+    <a href="./faq.html">FAQ</a>
+    <a href="#Help">Help</a>
+
+    <!-- 🔸 Botón profesional de conexión -->
+    <button id="walletBtn" class="wallet-btn">Connect Wallet</button>
+  </div>
+</header>
+
+
+<script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
+<script>
+  const walletBtn = document.getElementById("walletBtn");
+  let currentAddress = null;
+
+  // ✅ Verificar si existe Wander o ArConnect
+  function checkWallet() {
+    if (!window.arweaveWallet) {
+      alert("❗ No se detecta Wander o ArConnect. Instala la extensión.");
+      return false;
+    }
+    return true;
+  }
+
+  async function connectWallet() {
+    if (!checkWallet()) return;
+
+    try {
+      await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
+      currentAddress = await window.arweaveWallet.getActiveAddress();
+      const shortAddr = currentAddress.slice(0, 6) + "..." + currentAddress.slice(-4);
+      walletBtn.textContent = shortAddr;
+      walletBtn.classList.add("connected");
+      console.log("✅ Connected:", currentAddress);
+    } catch (err) {
+      console.error("Connection error:", err);
+    }
+  }
+
+  async function disconnectWallet() {
+    try {
+      await window.arweaveWallet.disconnect();
+      currentAddress = null;
+      walletBtn.textContent = "Connect Wallet";
+      walletBtn.classList.remove("connected");
+      console.log("🔌 Disconnected");
+    } catch (err) {
+      console.error("Disconnect error:", err);
+    }
+  }
+
+  walletBtn.addEventListener("click", () => {
+    if (currentAddress) disconnectWallet();
+    else connectWallet();
+  });
+</script>
+
+<main>
+
+
+
+    <video controls>
+        <source src="2zzzz.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <div class="description-box">
+        <h2>Description</h2>
+        <p>This is a brief description of the video. You can include details about the content, what viewers can expect,
+            and any other relevant information.</p>
+        <p>For more information, visit <a href="https://example.com" target="_blank"><u>this link</u></a>.</p>
+    </div>
+
+    <h1>Arweave Data:</h1>
+    <div id="resultDisplay">Loading...</div> <!-- Element to display the result -->
+
+    <div class="comment-box" id="commentBox">
+        <div class="comment-title">Comments</div>
+        <!-- Comments will be dynamically inserted here -->
+    </div>
+    <script>
+
+        async function checkForRepliesByTransactionId(referenceValue) {
+            // const domain = "arnode.xyz";
+            const url = `https://${domain}/graphql`;
+
+            const query = `
+    {
+      transactions(first: 20, tags: [
+        { name: "cloudweaver", values: ["${referenceValue}"] }
+      ]) {
+        edges {
+          node {
+            id
+            owner {
+              address
+            }
+            tags {
+              name
+              value
+            }
+            block {
+              timestamp
+            }
+          }
+        }
       }
-    });
+    }`;
 
-    cargarProductos();
-  </script>
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                const transactions = data.data.transactions.edges.map(edge => edge.node);
+                await displayComments(transactions, domain, hostname); // Call the function to display comments
+            } catch (error) {
+                console.error("An error occurred:", error);
+            }
+        }
+
+        async function checkRepliesToReply(referenceValue) {
+            // const domain = "arnode.xyz";
+            const url = `https://${domain}/graphql`;
+
+            const query = `
+        {
+        transactions(first: 20, tags: [
+            { name: "cloudweaver", values: ["${referenceValue}"] }
+        ]) {
+            edges {
+            node {
+                id
+                owner {
+                address
+                }
+                tags {
+                name
+                value
+                }
+                block {
+                timestamp
+                }
+            }
+            }
+        }
+        }`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                const transactions = data.data.transactions.edges.map(edge => edge.node);
+                return transactions;
+            } catch (error) {
+                console.error("An error occurred:", error);
+            }
+        }
+
+
+        async function hasTransactions(walletFrom, walletTo, minAmount) {
+            const query = `
+        {
+            transactions(first: 10, owners: ["${walletFrom}"]) {
+                edges {
+                    node {
+                        id
+                        recipient
+                        quantity {
+                            winston
+                        }
+                    }
+                }
+            }
+        }
+        `;
+
+            const response = await fetch(`https://${domain}/graphql`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('GraphQL Error:', errorText);
+                throw new Error('Failed to fetch transactions');
+            }
+
+            const data = await response.json();
+
+            // Log the raw JSON response
+            console.log('Raw JSON Response:', JSON.stringify(data, null, 2));
+
+            // Check if the data structure is valid
+            if (!data.data || !data.data.transactions || !data.data.transactions.edges) {
+                console.error('Unexpected response structure:', data);
+                return false; // No transactions found
+            }
+
+            // Check for transactions to the specified wallet with amount above minAmount
+            const transactions = data.data.transactions.edges;
+            let foundTransaction = false;
+
+            for (const transaction of transactions) {
+                const recipientAddress = transaction.node.recipient;
+                const transactionNode = transaction.node; // Store the node for logging
+                const transactionAmountStr = transactionNode.quantity ? transactionNode.quantity.winston : undefined; // Safely access the amount
+
+                // Debugging output
+                console.log(`Transaction Node:`, transactionNode);
+                console.log(`Transaction ID: ${transactionNode.id}, Amount String: ${transactionAmountStr}`);
+
+                const transactionAmount = parseInt(transactionAmountStr); // Parse the string to an integer
+
+                if (recipientAddress === walletTo && transactionAmount > minAmount) {
+                    console.log(`Transaction found: ID ${transactionNode.id}, Amount ${transactionAmount}`);
+                    foundTransaction = true; // Transaction found with amount above minAmount
+                }
+            }
+
+            return foundTransaction; // Return whether any transaction was found
+        }
+
+        async function loadBlocklist(hostname) {
+            const response = await fetch(`./blocklist.txt`);
+            const text = await response.text();
+            // Split the text into an array of banned addresses, trimming whitespace
+            return text.split('\n').map(address => address.trim()).filter(Boolean);
+        }
+
+        async function displayComments(transactions, domain, hostname) {
+            const commentBox = document.getElementById('commentBox');
+
+            // Load the blocklist once
+            const blocklist = await loadBlocklist(hostname);
+
+            for (const transaction of transactions) {
+                const transactionId = transaction.id;
+                const ownerAddress = transaction.owner.address;
+
+                try {
+                    const dudePaid = await hasTransactions(ownerAddress, walletTo, minAmount);
+
+                    // Check if the ownerAddress is in the blocklist
+                    if (dudePaid === true && !blocklist.includes(ownerAddress)) {
+                        // Fetch the content of the transaction
+                        const content = await fetchTransactionContent(transactionId, domain);
+
+                        // Create the main comment div
+                        const commentDiv = document.createElement('div');
+                        commentDiv.className = 'comment';
+
+                        // Create a div for the author and transaction ID
+                        const commentDivOne = document.createElement('div');
+                        commentDivOne.textContent = `Author: ${ownerAddress} with TxId: ${transactionId}`;
+                        commentDiv.appendChild(commentDivOne); // Append to the main comment div
+
+                        // Create a div for the content
+                        const commentDivTwo = document.createElement('div');
+                        commentDivTwo.className = 'comment-content'; // Apply the CSS class
+                        commentDivTwo.textContent = content;
+                        commentDiv.appendChild(commentDivTwo); // Append to the main comment div
+
+                        // Finally, append the main comment div to the comment box
+                        commentBox.appendChild(commentDiv);
+
+
+
+                        // Now we're getting the replies to the reply:
+                        const nestedReplies = await checkRepliesToReply(transactionId);
+                        console.log('Nested Replies:', nestedReplies); // debug line
+
+                        // Are there any replies to the reply? If so, create an element for it,
+                        if (nestedReplies.length > 0) {
+                            const nestedRepliesDiv = document.createElement('div');
+                            nestedRepliesDiv.className = 'nested-replies';
+
+                            // Loop through them:
+                            for (const each_reply_to_reply of nestedReplies) {
+                                const reply_to_reply_transactionid = each_reply_to_reply.id;
+                                const reply_to_reply_author = each_reply_to_reply.owner.address;
+
+                                try {
+                                    // get a variable on if this guy paid:
+                                    const dudePaid_for_reply_to_reply = await hasTransactions(reply_to_reply_author, walletTo, minAmount);
+
+                                    // Check if the reply-to-reply ownerAddress is in the blocklist and paid:
+                                    if (dudePaid_for_reply_to_reply === true && !blocklist.includes(reply_to_reply_author)) {
+                                        // Get the content of his reply to reply post (transaction):
+                                        const reply_to_reply_content = await fetchTransactionContent(reply_to_reply_transactionid, domain);
+
+                                        // Create a new div for the reply to reply
+                                        const replyDiv = document.createElement('div');
+                                        replyDiv.className = 'reply-to-reply';
+                                        replyDiv.textContent = `${reply_to_reply_author}: ${reply_to_reply_content}`;
+                                        nestedRepliesDiv.appendChild(replyDiv);
+                                    }
+                                } catch (error) {
+                                    console.error('Error fetching reply to reply transaction:', error);
+                                }
+                            }
+                            commentDiv.appendChild(nestedRepliesDiv); // Append nested replies to the comment
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching transaction:', error);
+                    // Handle error as needed, e.g., show a message or log it
+                }
+            }
+        }
+
+        async function fetchTransactionContent(transactionId, domain) {
+            const url = `https://${domain}/${transactionId}`; // Construct the URL for the transaction
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch content for transaction ID ${transactionId}: ${response.status}`);
+                }
+                const textContent = await response.text(); // Get the text content of the transaction
+                return textContent; // Return the content
+            } catch (error) {
+                console.error(error);
+                return "Content not available"; // Fallback message if content fetch fails
+            }
+        }
+
+        // Global Variables
+        let whatTransactionPost;
+        let subdomain = '';
+        let domain = '';
+        let hostname;
+
+        let walletTo;
+        let minAmount;
+        walletTo = 'BYV27vTsvrHI9vkYudgP_rjhhzBce4GGB2vF87zS5EA';
+        minAmount = 9000000000; // Define the minimum amount
+
+
+        // Function to get the current URL and extract the hostname
+        function extractHostname() {
+            const currentUrl = window.location.href;
+            const url = new URL(currentUrl);
+            hostname = url.hostname;
+        }
+
+        // Function to split the hostname into subdomain and domain
+        function splitHostname() {
+            const parts = hostname.split('.');
+            if (parts.length > 2) {
+                subdomain = parts.slice(0, parts.length - 2).join('.');
+                domain = parts.slice(parts.length - 2).join('.');
+            } else {
+                domain = hostname;
+            }
+        }
+
+        // Function to construct the JSON URL
+        function constructJsonUrl() {
+            return `https://${domain}/ar-io/resolver/${subdomain}`;
+        }
+
+        // Function to fetch the first JSON data
+        async function fetchFirstJson() {
+            const jsonUrl = constructJsonUrl();
+            const response = await fetch(jsonUrl);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const data = await response.json();
+            console.log("The txId is:", data.txId);
+            return data.txId;
+        }
+
+        // Function to fetch the second JSON data
+        async function fetchSecondJson(txId) {
+            const secondJsonUrl = `https://${domain}/raw/${txId}`;
+            const response = await fetch(secondJsonUrl);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return await response.json();
+        }
+
+        // Function to process the second JSON data
+        function processSecondJson(data) {
+            const searchfor = "2zzzz.mp4";
+            const result = data.paths[searchfor];
+
+            if (result) {
+                console.log(`The value corresponding to "${searchfor}" is:`, result.id);
+                whatTransactionPost = result.id; // Assign to the global variable
+                document.getElementById('resultDisplay').innerText = `To reply to the video "${searchfor}" use the Arweave hash: ${result.id}`;
+            } else {
+                console.log(`"${searchfor}" not found in the JSON response.`);
+                document.getElementById('resultDisplay').innerText = `"${searchfor}" not found in the JSON response.`;
+            }
+        }
+
+        // Function to handle errors
+        function handleError(error) {
+            console.error('There was a problem with the fetch operation:', error);
+            document.getElementById('resultDisplay').innerText = 'An error occurred while fetching data.';
+        }
+
+        // Function to check for replies
+        async function checkReplies() {
+            if (whatTransactionPost) {
+                const transactions = await checkForRepliesByTransactionId(whatTransactionPost); // Correct function name
+                console.log(transactions);
+            } else {
+                console.log('No transaction ID available to check for replies.');
+            }
+        }
+
+        // Main function to orchestrate the flow
+        async function main() {
+            try {
+                extractHostname();
+                splitHostname();
+                const txId = await fetchFirstJson();
+                const secondJsonData = await fetchSecondJson(txId);
+                processSecondJson(secondJsonData);
+                await checkReplies(); // Call to check replies
+            } catch (error) {
+                handleError(error);
+            }
+        }
+
+        // Call the main function to execute the code
+        main();
+
+
+    </script>
+
+</main>
 </body>
+
 </html>
