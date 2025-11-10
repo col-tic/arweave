@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Wander Manual Sign Debug</title>
+  <meta charset="UTF-8">
+  <title>Auth Debug - Wander / JSON firmado</title>
 </head>
 <body>
-  <h2>🧩 Wander Manual Sign Debug</h2>
+  <h2>🧩 Autenticación Debug</h2>
+
+  <h3>Método 1: Conectar con Wander</h3>
   <button id="connectBtn">Conectar con Wander</button>
-  <button id="generateBtn" disabled>Generar firmar.json</button>
+
+  <h3>Método 2: Archivo firmado manualmente</h3>
+  <button id="generateBtn">Generar firmar.json</button>
   <input type="file" id="fileInput" accept=".json" />
   <pre id="output"></pre>
 
@@ -21,8 +25,7 @@
     const generateBtn = document.getElementById("generateBtn");
     const fileInput = document.getElementById("fileInput");
 
-    let address = null;
-
+    // === MÉTODO 1: Conectar con Wander ===
     connectBtn.onclick = async () => {
       if (!window.arweaveWallet) {
         alert("Instala la extensión Wander primero.");
@@ -30,16 +33,17 @@
       }
       try {
         await window.arweaveWallet.connect(["ACCESS_ADDRESS"]);
-        address = await window.arweaveWallet.getActiveAddress();
+        const address = await window.arweaveWallet.getActiveAddress();
         out("✅ Conectado con Wander", { address });
-        generateBtn.disabled = false;
       } catch (e) {
         out("❌ Error al conectar", { error: e.message });
       }
     };
 
-    // Genera JSON sin firmar
-    generateBtn.onclick = async () => {
+    // === MÉTODO 2: Autenticación manual ===
+
+    // Genera archivo sin firmar
+    generateBtn.onclick = () => {
       const tx = {
         format: 2,
         owner: "",
@@ -69,37 +73,44 @@
       try {
         const tx = JSON.parse(text);
         out("📂 Archivo firmado cargado", tx);
+
         if (!tx.signature) {
-          out("❌ No contiene firma");
+          out("❌ El JSON no contiene firma");
           return;
         }
 
-        // Verificar firma (solo si arweave.js está disponible)
-        out("⚙️ Verificando firma...");
+        // Verificar firma
         const valid = await verifySignature(tx);
         if (valid) {
-          out("✅ Firma válida. Dirección verificada: " + address);
+          const signer = await ownerToAddress(tx.owner);
+          out("✅ Firma válida", { signer });
         } else {
           out("❌ Firma inválida");
         }
       } catch (err) {
-        out("❌ Error al leer JSON", { error: err.message });
+        out("❌ Error al procesar archivo", { error: err.message });
       }
     };
 
+    // === Utils ===
     async function verifySignature(tx) {
-      try {
-        // cargar arweave-js dinamicamente
+      await ensureArweaveLoaded();
+      const arweave = window.Arweave.init();
+      return await arweave.transactions.verify(tx);
+    }
+
+    async function ownerToAddress(owner) {
+      await ensureArweaveLoaded();
+      const arweave = window.Arweave.init();
+      return await arweave.wallets.ownerToAddress(owner);
+    }
+
+    async function ensureArweaveLoaded() {
+      if (!window.Arweave) {
         const script = document.createElement("script");
         script.src = "https://unpkg.com/arweave@1.14.4/bundles/web.bundle.min.js";
         document.body.appendChild(script);
         await new Promise(r => script.onload = r);
-
-        const arweave = window.Arweave.init();
-        return await arweave.transactions.verify(tx);
-      } catch (e) {
-        out("⚠️ No se pudo verificar la firma", { error: e.message });
-        return false;
       }
     }
   </script>
