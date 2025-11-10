@@ -3,142 +3,65 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Connect Wallet - Debug Terminal</title>
+<title>Wander Connect Debug</title>
 <style>
-  body{font-family:monospace;background:#000;color:#0f0;margin:0;padding:18px}
-  h1{text-align:center;text-shadow:0 0 8px #00FF00}
-  .ribbon{background:#111;padding:12px;border-radius:6px;margin:12px auto;max-width:900px;text-align:center}
+  body{font-family:monospace;background:#000;color:#0f0;margin:0;padding:20px}
+  h1{text-align:center;text-shadow:0 0 10px #00FF00}
+  .ribbon{background:#111;padding:12px;border-radius:6px;text-align:center;margin-bottom:10px}
   button{background:none;border:2px solid #00FF00;color:#00FF00;padding:10px 18px;border-radius:6px;cursor:pointer}
-  button:hover{color:#000;background:#00FF00}
-  #terminal{background:#060606;border:1px solid #003300;color:#A6FFA6;padding:10px;height:300px;overflow:auto;white-space:pre-wrap;margin:12px auto;border-radius:6px;max-width:900px}
-  .row{max-width:900px;margin:0 auto}
-  .small{font-size:12px;color:#7AFF7A}
+  button:hover{background:#00FF00;color:#000}
+  #terminal{background:#060606;border:1px solid #003300;color:#A6FFA6;padding:10px;height:300px;overflow:auto;white-space:pre-wrap;margin-top:10px;border-radius:6px}
 </style>
+<script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
 </head>
 <body>
-  <h1>Connect Wallet — Debug</h1>
+  <h1>Wander Connect — Debug</h1>
   <div class="ribbon">
-    <button id="wanderBtn">Connect to Wander</button>
-    <button id="simSignBtn">Simulate External Signature</button>
+    <button id="connectBtn">Connect to Wander</button>
   </div>
-
-  <div class="row small">Terminal (registra mensajes enviados/recibidos entre página & wallet/extension/native host)</div>
-  <div id="terminal">Terminal iniciado...\n</div>
+  <div id="terminal">[INFO] Terminal iniciado…</div>
 
 <script>
-/* ---------- helpers terminal ---------- */
 const term = document.getElementById('terminal');
-function logLine(msg, type='info'){
+function log(msg, type='info') {
   const ts = new Date().toISOString();
-  const prefix = {info:'[INFO]', send:'[SEND]', recv:'[RECV]', err:'[ERR]'}[type] || '[?]';
-  term.textContent += `\n${ts} ${prefix} ${msg}`;
+  const color = type==='err' ? '#FF5555' : type==='event' ? '#55FFFF' : '#A6FFA6';
+  term.innerHTML += `\n<span style="color:${color}">${ts} [${type.toUpperCase()}] ${msg}</span>`;
   term.scrollTop = term.scrollHeight;
 }
 
-/* ---------- message schemas (ejemplos) ---------- */
-/*
-  Conexión:
-    page -> wallet: { type: 'CONNECT', app: 'MyApp', permissions: [...] }
-    wallet -> page: { type: 'CONNECT_RESPONSE', success: true, address: '...', publicKey: '...' }
-
-  Solicitud de firma (transacción):
-    page -> wallet: { type:'SIGN_REQUEST', payload: { data, tags, target, quantity } , requestId: 'uuid' }
-    wallet -> page: { type:'SIGNED', requestId:'uuid', signature: 'base64...', signedTx: {...} , txId: '...' }
-
-  If signing happens outside browser (native):
-    Flow is: page -> extension content script (postMessage) -> extension background -> native host (chrome.runtime.connectNative)
-    native host signs and returns signature back the same route.
-*/
-
-/* ---------- utility: generate simple requestId ---------- */
-function uid() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
-
-/* ---------- page -> wallet (postMessage) ---------- */
-function sendConnectRequest() {
-  const msg = {
-    type: 'CONNECT',
-    app: 'MyDemoApp',
-    permissions: ['ACCESS_ADDRESS','SIGN_TRANSACTION'],
-    requestId: uid()
-  };
-  logLine(JSON.stringify(msg), 'send');
-  // Standard way for page->extension: window.postMessage (extension content-script listens)
-  window.postMessage({ target: 'ARWEAVE_WALLET', payload: msg }, '*');
+// Detect if wallet is installed
+if (!window.arweaveWallet) {
+  log('❌ Wander wallet no detectada. Instálala primero desde Chrome Web Store.', 'err');
+} else {
+  log('✅ Wander wallet detectada. Listo para conectar.', 'info');
 }
 
-/* ---------- construct a dummy tx payload to sign ---------- */
-function buildTxPayload() {
-  const payload = {
-    data: "Hello Arweave - external sign test",
-    tags: [
-      { name: "Content-Type", value: "text/plain" },
-      { name: "App-Name", value: "MyDemoApp" }
-    ],
-    target: null,      // recipient address (optional)
-    quantity: "0"      // winston (string)
-  };
-  return payload;
-}
+// Botón conectar
+document.getElementById('connectBtn').addEventListener('click', async () => {
+  try {
+    log('Solicitando conexión a Wander...', 'event');
+    const perms = ["ACCESS_ADDRESS", "SIGN_TRANSACTION"];
+    const res = await window.arweaveWallet.connect(perms);
+    log('Respuesta connect() => ' + JSON.stringify(res, null, 2), 'info');
 
-/* ---------- page -> wallet : SIGN_REQUEST ---------- */
-function sendSignRequest() {
-  const requestId = uid();
-  const payload = buildTxPayload();
-  const msg = {
-    type: 'SIGN_REQUEST',
-    requestId,
-    payload
-  };
-  logLine(JSON.stringify(msg), 'send');
-  window.postMessage({ target: 'ARWEAVE_WALLET', payload: msg }, '*');
-  return requestId;
-}
-
-/* ---------- listener: page receives messages from wallet/extension/native via postMessage ---------- */
-window.addEventListener('message', (ev) => {
-  // Security: in real code check ev.origin and ev.source as needed
-  if (!ev.data || !ev.data.from) return; // ignore unrelated messages
-  const from = ev.data.from;
-  const payload = ev.data.payload;
-  logLine(`[from=${from}] ${JSON.stringify(payload)}`, 'recv');
-
-  // Example: handle connect response
-  if (payload.type === 'CONNECT_RESPONSE') {
-    if (payload.success) {
-      logLine(`Connected: address=${payload.address}`, 'info');
-    } else {
-      logLine(`Connect failed: ${payload.error || 'unknown'}`, 'err');
-    }
-  }
-
-  if (payload.type === 'SIGNED') {
-    logLine(`SIGNED RESPONSE: requestId=${payload.requestId} txId=${payload.txId || '(no txId)'}`, 'recv');
-    // payload.signature || payload.signedTx contains the signed result
+    const addr = await window.arweaveWallet.getActiveAddress();
+    log('Dirección activa => ' + addr, 'info');
+  } catch (e) {
+    log('Error durante conexión => ' + e.message, 'err');
+    console.error(e);
   }
 });
 
-/* ---------- button wiring ---------- */
-document.getElementById('wanderBtn').addEventListener('click', async () => {
-  logLine('Botón Connect clickeado', 'info');
-  sendConnectRequest();
-});
-
-document.getElementById('simSignBtn').addEventListener('click', async () => {
-  logLine('Iniciando petición de firma (envío SIGN_REQUEST)', 'info');
-  const reqId = sendSignRequest();
-  logLine(`Solicitud enviada. requestId=${reqId}`, 'info');
-});
-
-/* ---------- also expose a debug API so background scripts or extension devtools can call directly ---------- */
-window.debugApi = {
-  postToPage: (obj) => {
-    // simulate an external response coming back to page
-    window.postMessage(obj, '*');
+// Opcional: escucha mensajes cruzados del wallet (por si manda eventos)
+window.addEventListener("message", ev => {
+  if (typeof ev.data === "object") {
+    const data = JSON.stringify(ev.data, null, 2);
+    log("Mensaje postMessage capturado => " + data, "event");
   }
-};
-logLine('debugApi disponible: window.debugApi.postToPage(...)', 'info');
-
+});
 </script>
 </body>
 </html>
+
 
