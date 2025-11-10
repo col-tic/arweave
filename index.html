@@ -1,88 +1,306 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Verificar firmado Arweave</title>
+  <meta charset="UTF-8">
+  <title>Auth Debug - Wander / JSON firmado (SECURE)</title>
 </head>
 <body>
-  <h3>Verificar firmado.json (ArDrive / Python)</h3>
-
-  <input id="file" type="file" accept=".json" />
-  <button id="check" disabled>Verificar</button>
-
-  <pre id="out" style="background:#000;color:#0f0;padding:10px;height:300px;overflow:auto;"></pre>
-
+  <h2>🧩 Autenticación Debug (Modo Seguro)</h2>
+  <h3>Método 1: Conectar con Wander</h3>
+  <button id="connectBtn">Conectar con Wander</button>
+  <h3>Método 2: Archivo firmado manualmente</h3>
+  <button id="generateBtn">Generar firmar.json</button>
+  <input type="file" id="fileInput" accept=".json" />
+  <pre id="output"></pre>
   <script>
-    // Utils
-    const $ = id => document.getElementById(id);
-    const outEl = $("out");
-    const log = (...args) => { console.log(...args); outEl.textContent += args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ') + "\\n"; outEl.scrollTop = outEl.scrollHeight; };
-
-    let jsonText = null;
-
-    // Cargar arweave-js dinámicamente
-    async function ensureArweave() {
-      if (window.Arweave) return window.Arweave;
-      return new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = "https://unpkg.com/arweave@1.14.4/bundles/web.bundle.min.js";
-        s.onload = () => { resolve(window.Arweave); };
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    }
-
-    // Leer archivo
-    $("file").addEventListener("change", async (ev) => {
-      outEl.textContent = "";
-      const f = ev.target.files[0];
-      if (!f) return;
-      const text = await f.text();
+    // Estado de sesión
+    let sessionNonce = null;
+    let sessionTimestamp = null;
+    
+    const out = (msg, data) => {
+      const pre = document.getElementById("output");
+      const timestamp = new Date().toISOString();
+      pre.textContent += `\n[${timestamp}] ${msg}` + (data ? "\n" + JSON.stringify(data, null, 2) : "");
+    };
+    
+    const connectBtn = document.getElementById("connectBtn");
+    const generateBtn = document.getElementById("generateBtn");
+    const fileInput = document.getElementById("fileInput");
+    
+    // === MÉTODO 1: Conectar con Wander ===
+    connectBtn.onclick = async () => {
+      out("🔍 DEBUG: Verificando extensión Wander...");
+      if (!window.arweaveWallet) {
+        out("❌ SEGURIDAD: Extensión Wander no detectada");
+        alert("Instala la extensión Wander primero.");
+        return;
+      }
       try {
-        const json = JSON.parse(text);
-        jsonText = json;
-        log("📂 Archivo cargado:", f.name);
-        log("👀 Keys presentes:", Object.keys(json));
-        $("check").disabled = false;
+        out("🔐 DEBUG: Solicitando permisos...");
+        await window.arweaveWallet.connect(["ACCESS_ADDRESS", "SIGN_TRANSACTION"]);
+        const address = await window.arweaveWallet.getActiveAddress();
+        out("✅ SEGURIDAD: Conexión autenticada", { address });
       } catch (e) {
-        log("❌ JSON inválido:", e.message);
-        $("check").disabled = true;
+        out("❌ ERROR:", { error: e.message, stack: e.stack });
       }
-    });
-
-    // Verificar
-    $("check").addEventListener("click", async () => {
-      if (!jsonText) return log("No hay JSON cargado.");
+    };
+    
+    // === MÉTODO 2: Autenticación manual ===
+    generateBtn.onclick = () => {
+      out("🔐 DEBUG: Generando nonce de sesión...");
+      
+      // Generar nonce criptográficamente seguro
+      const nonceArray = new Uint8Array(32);
+      crypto.getRandomValues(nonceArray);
+      sessionNonce = Array.from(nonceArray, b => b.toString(16).padStart(2, '0')).join('');
+      sessionTimestamp = Date.now();
+      
+      out("✅ SEGURIDAD: Nonce generado", { 
+        nonce: sessionNonce.substring(0, 16) + "...",
+        timestamp: sessionTimestamp 
+      });
+      
+      const payload = `login-request-${sessionTimestamp}-${sessionNonce}`;
+      
+      const tx = {
+        format: 2,
+        owner: "",
+        target: "",
+        quantity: "0",
+        data: btoa(payload),
+        reward: "0",
+        last_tx: "",
+        tags: [
+          { name: "App-Name", value: "ManualLogin" },
+          { name: "Content-Type", value: "text/plain" },
+          { name: "Nonce", value: sessionNonce },
+          { name: "Timestamp", value: sessionTimestamp.toString() }
+        ],
+      };
+      
+      out("📋 DEBUG: Estructura de transacción", {
+        dataDecoded: payload,
+        tagsCount: tx.tags.length
+      });
+      
+      const blob = new Blob([JSON.stringify(tx, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "firmar.json";
+      a.click();
+      out("📄 Archivo generado: firmar.json");
+    };
+    
+    // Cargar archivo firmado con validaciones de seguridad
+    fileInput.onchange = async (e) => {
+      out("\n🔍 DEBUG: Procesando archivo subido...");
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      // Validación 1: Tamaño de archivo
+      out(`📊 DEBUG: Tamaño del archivo: ${file.size} bytes`);
+      if (file.size > 1024 * 1024) { // 1MB max
+        out("❌ SEGURIDAD: Archivo demasiado grande (max 1MB)");
+        return;
+      }
+      
+      // Validación 2: Tipo de archivo
+      if (file.type && file.type !== "application/json") {
+        out("⚠️ ADVERTENCIA: Tipo MIME inesperado", { type: file.type });
+      }
+      
+      const text = await file.text();
+      
       try {
-        const Arweave = await ensureArweave();
-        const arweave = Arweave.init(); // default conecta a arweave.net
-
-        // Reconstruir la instancia Transaction a partir del JSON
-        const tx = new arweave.transactions.Transaction(jsonText);
-
-        log("🔎 Verificando transacción...");
-        const ok = await arweave.transactions.verify(tx);
-        log("✅ verify() result:", ok);
-
-        // Obtener address desde owner
-        try {
-          const owner = tx.owner;
-          const address = await arweave.wallets.ownerToAddress(owner);
-          log("👤 owner:", owner);
-          log("🏷 address:", address);
-        } catch (e) {
-          log("⚠️ No se pudo derivar address:", e.message);
+        out("🔍 DEBUG: Parseando JSON...");
+        const tx = JSON.parse(text);
+        
+        // Validación 3: Estructura básica
+        out("🔍 DEBUG: Validando estructura...");
+        const requiredFields = ['format', 'owner', 'data', 'tags', 'signature', 'id'];
+        const missingFields = requiredFields.filter(f => !(f in tx));
+        
+        if (missingFields.length > 0) {
+          out("❌ SEGURIDAD: Campos faltantes", { missing: missingFields });
+          return;
         }
-
-        // Mostrar algunos campos relevantes
-        log("tx.id:", tx.id);
-        log("tx.signature:", Boolean(tx.signature));
-        log("tx.tags:", tx.tags || []);
-
+        
+        out("✅ DEBUG: Estructura básica válida");
+        
+        // Validación 4: Formato de transacción
+        if (tx.format !== 2) {
+          out("❌ SEGURIDAD: Formato de transacción inválido", { format: tx.format });
+          return;
+        }
+        
+        // Validación 5: Verificar nonce de sesión
+        const txNonce = tx.tags?.find(t => t.name === "Nonce")?.value;
+        const txTimestamp = tx.tags?.find(t => t.name === "Timestamp")?.value;
+        
+        out("🔍 DEBUG: Verificando nonce...", { 
+          sessionNonce: sessionNonce?.substring(0, 16) + "...",
+          txNonce: txNonce?.substring(0, 16) + "..." 
+        });
+        
+        if (!sessionNonce) {
+          out("⚠️ ADVERTENCIA: No hay sesión activa - genera firmar.json primero");
+        } else if (txNonce !== sessionNonce) {
+          out("❌ SEGURIDAD: Nonce no coincide - posible replay attack", {
+            expected: sessionNonce.substring(0, 16) + "...",
+            received: txNonce?.substring(0, 16) + "..."
+          });
+          return;
+        } else {
+          out("✅ SEGURIDAD: Nonce verificado correctamente");
+        }
+        
+        // Validación 6: Verificar timestamp (no más de 10 minutos)
+        if (sessionTimestamp && txTimestamp) {
+          const age = Date.now() - parseInt(txTimestamp);
+          const ageMinutes = Math.floor(age / 60000);
+          out(`🕐 DEBUG: Edad de la transacción: ${ageMinutes} minutos`);
+          
+          if (age > 600000) { // 10 minutos
+            out("❌ SEGURIDAD: Transacción expirada (>10 min)");
+            return;
+          }
+        }
+        
+        // Validación 7: Verificar data coincide con nonce
+        const dataDecoded = atob(tx.data);
+        out("🔍 DEBUG: Payload decodificado", { payload: dataDecoded });
+        
+        if (sessionNonce && !dataDecoded.includes(sessionNonce)) {
+          out("❌ SEGURIDAD: Data no contiene el nonce esperado");
+          return;
+        }
+        
+        // Validación 8: Longitud de firma y owner (Base64URL)
+        const base64UrlRegex = /^[A-Za-z0-9_-]+$/;
+        if (!base64UrlRegex.test(tx.signature)) {
+          out("❌ SEGURIDAD: Formato de firma inválido");
+          return;
+        }
+        if (!base64UrlRegex.test(tx.owner)) {
+          out("❌ SEGURIDAD: Formato de owner inválido");
+          return;
+        }
+        
+        out("📂 Archivo firmado cargado y validado", {
+          id: tx.id,
+          signatureLength: tx.signature.length,
+          ownerLength: tx.owner.length
+        });
+        
+        // Verificar firma criptográfica
+        out("🔐 DEBUG: Verificando firma criptográfica...");
+        const valid = await verifySignature(tx);
+        
+        if (valid) {
+          const signer = await ownerToAddress(tx.owner);
+          out("✅ SEGURIDAD: Firma criptográfica VÁLIDA", { signer });
+          
+          // Limpiar sesión después de uso exitoso
+          sessionNonce = null;
+          sessionTimestamp = null;
+          out("🧹 DEBUG: Sesión limpiada");
+          
+        } else {
+          out("❌ SEGURIDAD: Firma criptográfica INVÁLIDA - transacción rechazada");
+        }
+        
       } catch (err) {
-        log("❌ Error verificando:", err && err.message ? err.message : err);
+        out("❌ ERROR al procesar archivo", { 
+          error: err.message,
+          stack: err.stack,
+          name: err.name
+        });
       }
-    });
+    };
+    
+    // === Utils ===
+    async function verifySignature(tx) {
+      try {
+        await ensureArweaveLoaded();
+        
+        // Esperar un tick adicional para asegurar que Arweave esté completamente inicializado
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (!window.Arweave) {
+          throw new Error("Arweave library failed to initialize");
+        }
+        
+        const arweave = window.Arweave.init({
+          host: 'arweave.net',
+          port: 443,
+          protocol: 'https'
+        });
+        
+        out("🔍 DEBUG: Arweave inicializado", { 
+          hasTransactions: !!arweave.transactions,
+          hasTransaction: !!arweave.transactions.Transaction
+        });
+        
+        // Crear objeto Transaction desde JSON
+        const transaction = new arweave.transactions.Transaction(tx);
+        const result = await arweave.transactions.verify(transaction);
+        
+        out("🔍 DEBUG: Resultado de verificación criptográfica", { valid: result });
+        return result;
+      } catch (err) {
+        out("❌ ERROR en verificación", { 
+          error: err.message, 
+          stack: err.stack,
+          hasArweave: !!window.Arweave
+        });
+        return false;
+      }
+    }
+    
+    async function ownerToAddress(owner) {
+      await ensureArweaveLoaded();
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const arweave = window.Arweave.init({
+        host: 'arweave.net',
+        port: 443,
+        protocol: 'https'
+      });
+      return await arweave.wallets.ownerToAddress(owner);
+    }
+    
+    async function ensureArweaveLoaded() {
+      if (!window.Arweave) {
+        out("📦 DEBUG: Cargando librería Arweave...");
+        
+        return new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://unpkg.com/arweave@1.14.4/bundles/web.bundle.min.js";
+          script.crossOrigin = "anonymous";
+          
+          script.onload = () => {
+            out("✅ DEBUG: Librería Arweave cargada");
+            // Esperar a que el objeto global esté disponible
+            setTimeout(() => {
+              if (window.Arweave) {
+                resolve();
+              } else {
+                reject(new Error("Arweave not available after load"));
+              }
+            }, 200);
+          };
+          
+          script.onerror = () => {
+            out("❌ ERROR: Falló la carga de Arweave");
+            reject(new Error("Failed to load Arweave library"));
+          };
+          
+          document.body.appendChild(script);
+        });
+      }
+    }
+    
+    out("🚀 Sistema iniciado - Modo debug seguro activado");
   </script>
 </body>
 </html>
