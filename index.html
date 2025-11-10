@@ -1,95 +1,115 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Wander Debug Terminal</title>
+  <title>Wander Manual Sign Flow</title>
+  <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #eee;
+      padding: 20px;
+    }
+    button {
+      margin: 8px;
+      padding: 10px 18px;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    pre {
+      background: #222;
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+  </style>
 </head>
 <body>
-  <h2>🧠 Wander Wallet Debug Terminal</h2>
-  <button id="connect">Connect Wallet</button>
-  <button id="test" disabled>Send Test Transaction</button>
-  <button id="clear">Clear</button>
-  <pre id="terminal" style="background:#000;color:#0f0;padding:10px;height:400px;overflow:auto;"></pre>
+  <h2>Conexión manual a Wander / Arweave</h2>
+
+  <button id="connectBtn">Conectar con Wander</button>
+  <button id="genTxBtn" disabled>Generar firmar.json</button>
+  <input type="file" id="uploadFile" style="display:none" accept=".json"/>
+  <button id="uploadBtn" disabled>Subir archivo firmado</button>
+
+  <pre id="log"></pre>
 
   <script>
-    const terminal = document.getElementById("terminal");
-    const connectBtn = document.getElementById("connect");
-    const testBtn = document.getElementById("test");
-    const clearBtn = document.getElementById("clear");
-    let connected = false;
+    const log = (msg, obj) => {
+      const pre = document.getElementById("log");
+      pre.textContent += msg + (obj ? "\\n" + JSON.stringify(obj, null, 2) : "") + "\\n\\n";
+    };
 
-    function log(type, msg, data) {
-      const time = new Date().toLocaleTimeString();
-      let entry = `[${time}] ${type.toUpperCase()}: ${msg}`;
-      if (data) entry += "\n" + JSON.stringify(data, null, 2);
-      terminal.textContent += entry + "\n\n";
-      terminal.scrollTop = terminal.scrollHeight;
-      console.log(type, msg, data || "");
-    }
+    let arweave = Arweave.init({ host: "arweave.net", protocol: "https" });
+    let wanderConnected = false;
 
-    function checkWallet() {
-      if (!window.arweaveWallet) {
-        log("error", "Wander wallet not detected");
-        return false;
-      }
-      log("info", "Wander wallet detected");
-      return true;
-    }
-
-    async function connect() {
-      if (!checkWallet()) return;
+    // 1️⃣ Conectar con Wander
+    document.getElementById("connectBtn").onclick = async () => {
       try {
-        log("send", "Connecting to Wander...", { permissions: ["ACCESS_ADDRESS", "DISPATCH"] });
-        await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
+        await window.arweaveWallet.connect(["ACCESS_ADDRESS"]);
         const addr = await window.arweaveWallet.getActiveAddress();
-        log("recv", "Connected", { address: addr });
-        connectBtn.textContent = "Disconnect";
-        connected = true;
-        testBtn.disabled = false;
-      } catch (e) {
-        log("error", "Connection failed", { message: e.message });
+        wanderConnected = true;
+        log("✅ Conectado a Wander", { address: addr });
+        document.getElementById("genTxBtn").disabled = false;
+      } catch (err) {
+        log("❌ Error al conectar", { error: err.message });
       }
-    }
+    };
 
-    async function disconnect() {
+    // 2️⃣ Generar transacción sin firmar y descargarla
+    document.getElementById("genTxBtn").onclick = async () => {
+      if (!wanderConnected) return alert("Primero conecta la wallet");
+
+      const tx = await arweave.createTransaction({
+        data: "Conectar sesión manual"
+      });
+
+      tx.addTag("App-Name", "ManualLogin");
+      tx.addTag("Content-Type", "text/plain");
+      delete tx.signature;
+      delete tx.id;
+
+      const blob = new Blob([JSON.stringify(tx, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "firmar.json";
+      a.click();
+
+      log("📤 Transacción generada. Descarga firmar.json, fírmala externamente y súbela después.");
+      document.getElementById("uploadBtn").disabled = false;
+    };
+
+    // 3️⃣ Subir archivo firmado
+    document.getElementById("uploadBtn").onclick = () => {
+      document.getElementById("uploadFile").click();
+    };
+
+    document.getElementById("uploadFile").onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const content = await file.text();
+      const tx = JSON.parse(content);
+
       try {
-        await window.arweaveWallet.disconnect();
-        log("info", "Disconnected");
-      } catch (e) {
-        log("error", "Disconnect failed", { message: e.message });
+        // Verificar firma
+        const valid = await arweave.transactions.verify(tx);
+        if (!valid) throw new Error("Firma inválida");
+
+        // Obtener dirección pública desde el 'owner'
+        const addr = await arweave.wallets.ownerToAddress(tx.owner);
+        log("✅ Archivo firmado válido. Dirección extraída:", { address: addr });
+
+        // Subir a la red (si quieres “loguearte” y registrar)
+        const res = await arweave.transactions.post(tx);
+        log("📡 Transacción subida a Arweave", { status: res.status, id: tx.id });
+      } catch (err) {
+        log("❌ Error al verificar o subir", { error: err.message });
       }
-      connected = false;
-      connectBtn.textContent = "Connect Wallet";
-      testBtn.disabled = true;
-    }
-
-    async function sendTestTx() {
-      try {
-        const tx = {
-          data: "Debug " + Date.now(),
-          tags: [
-            { name: "App-Name", value: "WanderDebug" },
-            { name: "Content-Type", value: "text/plain" }
-          ]
-        };
-        log("send", "Dispatching TX", tx);
-        const res = await window.arweaveWallet.dispatch(tx);
-        log("recv", "TX Signed", res);
-      } catch (e) {
-        log("error", "TX Failed", { message: e.message });
-      }
-    }
-
-    connectBtn.onclick = () => connected ? disconnect() : connect();
-    testBtn.onclick = sendTestTx;
-    clearBtn.onclick = () => { terminal.textContent = ""; };
-
-    window.addEventListener("arweaveWalletLoaded", () => {
-      log("info", "arweaveWalletLoaded event detected ✅");
-    });
-
-    log("info", "Wander Debug Terminal ready. Click 'Connect Wallet' to start.");
+    };
   </script>
 </body>
 </html>
-
