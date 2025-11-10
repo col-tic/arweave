@@ -3,645 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Title 1</title>
-    <meta property="og:image" content="https://example.com/images/video1_thumbnail.jpg" />
-    <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
-</head>
-<body>
-    <header>
-    <h1>Video Title 1</h1>
-    <div class="menu-ribbon">
-        <a href="#Home">Videos</a>
-        <a href="./about.html">About</a>
-        <a href="./gateways.html">Gateways</a>
-        <a href="./faq.html">FAQ</a>
-        <a href="#Help">Help</a>
-        <button id="wanderBtn" class="wander-btn">Connect to Wander</button>
-    </div>
-    </header>
-
-    <main>
-    <video controls>
-        <source src="2zzzz.mp4" type="video/mp4">
-        Your browser does not support the video tag.
-    </video>
-    <div class="description-box">
-        <h2>Description</h2>
-        <p>This is a brief description of the video. You can include details about the content, what viewers can expect,
-            and any other relevant information.</p>
-        <p>For more information, visit <a href="https://example.com" target="_blank"><u>this link</u></a>.</p>
-    </div>
-    <h1>Arweave Data:</h1>
-    <div id="resultDisplay">Loading...</div> <!-- Element to display the result -->
-    <div class="add-comment">
-        <textarea id="commentInput" placeholder="Write a comment..." rows="3"></textarea>
-        <button id="commentButton">Post Comment</button>
-    </div>
-    <div class="comment-box" id="commentBox">
-        <div class="comment-title">Comments</div>
-        <!-- Comments will be dynamically inserted here -->
-    </div>
-
-<script>
-  const wanderBtn = document.getElementById("wanderBtn");
-  let currentAddress = null;
-
-  // ✅ Verificar si Wander está disponible
-  function checkWander() {
-    if (!window.arweaveWallet) {
-      alert("❗ No se detecta Wander. Instala la extensión desde la Chrome Web Store.");
-      return false;
-    }
-    return true;
-  }
-
-  async function connectWander() {
-    if (!checkWander()) return;
-
-    try {
-      await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
-      currentAddress = await window.arweaveWallet.getActiveAddress();
-      wanderBtn.textContent = "Disconnect";
-      wanderBtn.classList.add("connected");
-      console.log("✅ Connected to Wander:", currentAddress);
-    } catch (err) {
-      console.error("Connection error:", err);
-      alert("Error connecting: " + err.message);
-    }
-  }
-
-  async function disconnectWander() {
-    try {
-      await window.arweaveWallet.disconnect();
-      currentAddress = null;
-      wanderBtn.textContent = "Connect to Wander";
-      wanderBtn.classList.remove("connected");
-      console.log("🔌 Disconnected from Wander");
-    } catch (err) {
-      console.error("Disconnect error:", err);
-    }
-  }
-
-  wanderBtn.addEventListener("click", () => {
-    if (currentAddress) disconnectWander();
-    else connectWander();
-  });
-</script>
-
-<!-- ==================== BLOQUE 1: CONFIG & CONSTANTS ==================== -->
-<script>
-    // Configuración global y constantes
-    let whatTransactionPost;
-    let subdomain = '';
-    let domain = '';
-    let hostname;
-    let walletTo;
-    let minAmount;
-    walletTo = 'BYV27vTsvrHI9vkYudgP_rjhhzBce4GGB2vF87zS5EA';
-    minAmount = 9000000000;
-</script>
-
-<!-- ==================== BLOQUE 2: URL & HOSTNAME UTILS ==================== -->
-<script>
-    function extractHostname() {
-        const currentUrl = window.location.href;
-        const url = new URL(currentUrl);
-        hostname = url.hostname;
-    }
-
-    function splitHostname() {
-        const parts = hostname.split('.');
-        if (parts.length > 2) {
-            subdomain = parts.slice(0, parts.length - 2).join('.');
-            domain = parts.slice(parts.length - 2).join('.');
-        } else {
-            domain = hostname;
-        }
-    }
-
-    function constructJsonUrl() {
-        return `https://${domain}/ar-io/resolver/${subdomain}`;
-    }
-</script>
-
-<!-- ==================== BLOQUE 3: ARWEAVE DATA FETCHERS ==================== -->
-<script>
-    async function fetchFirstJson() {
-        const jsonUrl = constructJsonUrl();
-        const response = await fetch(jsonUrl);
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        const data = await response.json();
-        console.log("The txId is:", data.txId);
-        return data.txId;
-    }
-
-    async function fetchSecondJson(txId) {
-        const secondJsonUrl = `https://${domain}/raw/${txId}`;
-        const response = await fetch(secondJsonUrl);
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return await response.json();
-    }
-
-    async function fetchTransactionContent(transactionId, domain) {
-        const url = `https://${domain}/${transactionId}`;
-
-        try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch content for transaction ID ${transactionId}: ${response.status}`);
-            }
-            const textContent = await response.text();
-            return textContent;
-        } catch (error) {
-            console.error(error);
-            return "Content not available";
-        }
-    }
-</script>
-
-<!-- ==================== BLOQUE 4: GRAPHQL QUERIES ==================== -->
-<script>
-    async function checkForRepliesByTransactionId(referenceValue) {
-        const url = `https://${domain}/graphql`;
-
-        const query = `
-    {
-      transactions(first: 20, tags: [
-        { name: "cloudweaver", values: ["${referenceValue}"] }
-      ]) {
-        edges {
-          node {
-            id
-            owner {
-              address
-            }
-            tags {
-              name
-              value
-            }
-            block {
-              timestamp
-            }
-          }
-        }
-      }
-    }`;
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ query: query }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            const transactions = data.data.transactions.edges.map(edge => edge.node);
-            await displayComments(transactions, domain, hostname);
-        } catch (error) {
-            console.error("An error occurred:", error);
-        }
-    }
-
-    async function checkRepliesToReply(referenceValue) {
-        const url = `https://${domain}/graphql`;
-
-        const query = `
-        {
-        transactions(first: 20, tags: [
-            { name: "cloudweaver", values: ["${referenceValue}"] }
-        ]) {
-            edges {
-            node {
-                id
-                owner {
-                address
-                }
-                tags {
-                name
-                value
-                }
-                block {
-                timestamp
-                }
-            }
-            }
-        }
-        }`;
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ query: query }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            const transactions = data.data.transactions.edges.map(edge => edge.node);
-            return transactions;
-        } catch (error) {
-            console.error("An error occurred:", error);
-        }
-    }
-
-    async function hasTransactions(walletFrom, walletTo, minAmount) {
-        const query = `
-        {
-            transactions(first: 10, owners: ["${walletFrom}"]) {
-                edges {
-                    node {
-                        id
-                        recipient
-                        quantity {
-                            winston
-                        }
-                    }
-                }
-            }
-        }
-        `;
-
-        const response = await fetch(`https://${domain}/graphql`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ query }),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('GraphQL Error:', errorText);
-            throw new Error('Failed to fetch transactions');
-        }
-
-        const data = await response.json();
-
-        console.log('Raw JSON Response:', JSON.stringify(data, null, 2));
-
-        if (!data.data || !data.data.transactions || !data.data.transactions.edges) {
-            console.error('Unexpected response structure:', data);
-            return false;
-        }
-
-        const transactions = data.data.transactions.edges;
-        let foundTransaction = false;
-
-        for (const transaction of transactions) {
-            const recipientAddress = transaction.node.recipient;
-            const transactionNode = transaction.node;
-            const transactionAmountStr = transactionNode.quantity ? transactionNode.quantity.winston : undefined;
-
-            console.log(`Transaction Node:`, transactionNode);
-            console.log(`Transaction ID: ${transactionNode.id}, Amount String: ${transactionAmountStr}`);
-
-            const transactionAmount = parseInt(transactionAmountStr);
-
-            if (recipientAddress === walletTo && transactionAmount > minAmount) {
-                console.log(`Transaction found: ID ${transactionNode.id}, Amount ${transactionAmount}`);
-                foundTransaction = true;
-            }
-        }
-
-        return foundTransaction;
-    }
-</script>
-
-<!-- ==================== BLOQUE 5: MODERATION & SECURITY ==================== -->
-<script>
-    async function loadBlocklist(hostname) {
-        const response = await fetch(`./blocklist.txt`);
-        const text = await response.text();
-        return text.split('\n').map(address => address.trim()).filter(Boolean);
-    }
-</script>
-
-<!-- ==================== BLOQUE 6: UI RENDERING ==================== -->
-<!-- ==================== BLOQUE 6: UI RENDERING (ACTUALIZADO) ==================== -->
-<script>
-    // Event listener para el botón de comentarios
-    document.getElementById('commentButton').addEventListener('click', async () => {
-        const input = document.getElementById('commentInput');
-        const commentText = input.value.trim();
-
-        if (commentText === '') return alert('Please write something first.');
-
-        // Verificar que haya un ID de transacción disponible
-        if (!whatTransactionPost) {
-            return alert('No transaction ID available. Please wait for the page to load.');
-        }
-
-        // Verificar que Wander esté conectado
-        if (!currentAddress) {
-            return alert('Please connect to Wander first.');
-        }
-
-        try {
-            // Crear la transacción en Arweave
-            const tx = await window.arweaveWallet.dispatch({
-                data: commentText,
-                tags: [
-                    { name: 'Content-Type', value: 'text/plain' },
-                    { name: 'cloudweaver', value: whatTransactionPost }, // ID de referencia
-                    { name: 'App-Name', value: 'CloudWeaver' },
-                    { name: 'Type', value: 'comment' }
-                ]
-            });
-
-            console.log('✅ Comment posted! Transaction ID:', tx.id);
-
-            // Mostrar el comentario pendiente
-            const newComment = document.createElement('div');
-            newComment.className = 'comment';
-            newComment.innerHTML = `
-                <div>Author: ${currentAddress} with TxId: ${tx.id}</div>
-                <div class="comment-content">${commentText}</div>
-                <div class="comment-meta" style="color: #FFA500;">⏳ Pending confirmation on Arweave...</div>
-            `;
-
-            document.getElementById('commentBox').appendChild(newComment);
-            input.value = ''; // Limpiar el input
-
-            alert(`✅ Comment posted successfully!\nTransaction ID: ${tx.id}\n\nIt will appear after blockchain confirmation (~2 minutes).`);
-
-        } catch (error) {
-            console.error('Error posting comment:', error);
-            alert('❌ Error posting comment: ' + error.message);
-        }
-    });
-
-    function processSecondJson(data) {
-        const searchfor = "2zzzz.mp4";
-        const result = data.paths[searchfor];
-
-        if (result) {
-            console.log(`The value corresponding to "${searchfor}" is:`, result.id);
-            whatTransactionPost = result.id;
-            document.getElementById('resultDisplay').innerText = `To reply to the video "${searchfor}" use the Arweave hash: ${result.id}`;
-        } else {
-            console.log(`"${searchfor}" not found in the JSON response.`);
-            document.getElementById('resultDisplay').innerText = `"${searchfor}" not found in the JSON response.`;
-        }
-    }
-
-    async function displayComments(transactions, domain, hostname) {
-        const commentBox = document.getElementById('commentBox');
-
-        const blocklist = await loadBlocklist(hostname);
-
-        for (const transaction of transactions) {
-            const transactionId = transaction.id;
-            const ownerAddress = transaction.owner.address;
-
-            try {
-                const dudePaid = await hasTransactions(ownerAddress, walletTo, minAmount);
-
-                if (dudePaid === true && !blocklist.includes(ownerAddress)) {
-                    const content = await fetchTransactionContent(transactionId, domain);
-
-                    const commentDiv = document.createElement('div');
-                    commentDiv.className = 'comment'
-                    const commentDivOne = document.createElement('div');
-                    commentDivOne.textContent = `Author: ${ownerAddress} with TxId: ${transactionId}`;
-                    commentDiv.appendChild(commentDivOne);
-                    const commentDivTwo = document.createElement('div');
-                    commentDivTwo.className = 'comment-content';
-                    commentDivTwo.textContent = content;
-                    commentDiv.appendChild(commentDivTwo);
-                    commentBox.appendChild(commentDiv);
-
-                    const nestedReplies = await checkRepliesToReply(transactionId);
-                    console.log('Nested Replies:', nestedReplies);
-
-                    if (nestedReplies.length > 0) {
-                        const nestedRepliesDiv = document.createElement('div');
-                        nestedRepliesDiv.className = 'nested-replies';
-
-                        for (const each_reply_to_reply of nestedReplies) {
-                            const reply_to_reply_transactionid = each_reply_to_reply.id;
-                            const reply_to_reply_author = each_reply_to_reply.owner.address;
-
-                            try {
-                                const dudePaid_for_reply_to_reply = await hasTransactions(reply_to_reply_author, walletTo, minAmount);
-
-                                if (dudePaid_for_reply_to_reply === true && !blocklist.includes(reply_to_reply_author)) {
-                                    const reply_to_reply_content = await fetchTransactionContent(reply_to_reply_transactionid, domain);
-
-                                    const replyDiv = document.createElement('div');
-                                    replyDiv.className = 'reply-to-reply';
-                                    replyDiv.textContent = `${reply_to_reply_author}: ${reply_to_reply_content}`;
-                                    nestedRepliesDiv.appendChild(replyDiv);
-                                }
-                            } catch (error) {
-                                console.error('Error fetching reply to reply transaction:', error);
-                            }
-                        }
-                        commentDiv.appendChild(nestedRepliesDiv);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching transaction:', error);
-            }
-        }
-    }
-</script>
-<!-- ==================== BLOQUE 7: MAIN CONTROLLER ==================== -->
-<script>
-    function handleError(error) {
-        console.error('There was a problem with the fetch operation:', error);
-        document.getElementById('resultDisplay').innerText = 'An error occurred while fetching data.';
-    }
-
-    async function checkReplies() {
-        if (whatTransactionPost) {
-            const transactions = await checkForRepliesByTransactionId(whatTransactionPost);
-            console.log(transactions);
-        } else {
-            console.log('No transaction ID available to check for replies.');
-        }
-    }
-
-    async function main() {
-        try {
-            extractHostname();
-            splitHostname();
-            const txId = await fetchFirstJson();
-            const secondJsonData = await fetchSecondJson(txId);
-            processSecondJson(secondJsonData);
-            await checkReplies();
-        } catch (error) {
-            handleError(error);
-        }
-    }
-
-    main();
-</script>
-
-</main>
-</body>
+    <title>Connect to Wander</title>
     <style>
         body {
             font-family: 'Courier New', Courier, monospace;
-            /* Monospace font for hacker look */
             background-color: #000;
-            /* Black background */
             margin: 0;
             padding: 20px;
             color: #00FF00;
-            /* Neon green text color */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            text-align: center;
         }
 
         h1 {
-            text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             text-shadow: 0 0 10px #00FF00;
-            /* Neon glow effect */
         }
 
-        .menu-ribbon {
-            background-color: #222;
-            /* Dark gray background for the ribbon */
-            padding: 10px;
-            text-align: center;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            /* Space between ribbon and video */
-        }
-
-        .menu-ribbon a {
-            color: #00FF00;
-            /* Neon green text color */
-            text-decoration: none;
-            /* Remove underline */
-            margin: 0 15px;
-            /* Space between links */
-            font-size: 18px;
-            /* Font size for links */
-            text-shadow: 0 0 5px #00FF00;
-            /* Neon glow effect */
-        }
-
-        button {
+        .wander-btn {
             background: none;
             color: #37006b;
-            text-decoration: none; /* Remove underline */
-            margin: 0 15px; /* Space between links */
-            font-size: 18px; /* Font size for links */
-            border: none;
+            font-size: 20px;
+            border: 2px solid #37006b;
+            padding: 15px 30px;
             text-shadow: 0 0 5px #37006b;
             font-family: 'Courier New', Courier, monospace;
             cursor: pointer;
-        }
-
-
-        .menu-ribbon a:hover {
-            color: #00CC00;
-            /* Slightly darker green on hover */
-        }
-
-        video {
-            width: 100%;
-            max-width: 800px;
-            /* Maximum width for the video */
-            height: auto;
-            display: block;
-            margin: 0 auto;
-            /* Center the video */
-            border: 4px solid #00FF00;
-            /* Neon green border */
-        }
-
-        .description-box {
-            background-color: #222;
-            /* Dark gray background for the description box */
             border-radius: 5px;
-            padding: 15px;
-            margin-top: 20px;
-            /* Space above the description box */
+            transition: all 0.3s;
+        }
+
+        .wander-btn:hover {
+            background-color: #37006b;
+            color: #000;
+        }
+
+        .wander-btn.connected {
             color: #00FF00;
-            /* Neon green text color */
+            border-color: #00FF00;
             text-shadow: 0 0 5px #00FF00;
-            /* Neon glow effect */
         }
 
-        .description-box a {
-            color: #00FF00;
-            /* Neon green text color for links */
-            text-decoration: none;
-            /* Remove underline */
+        .wander-btn.connected:hover {
+            background-color: #00FF00;
+            color: #000;
         }
 
-        .description-box a:hover {
-            color: #00CC00;
-            /* Slightly darker green on hover */
-        }
-
-        .comment-box {
-            background-color: #222;
-            /* Dark gray background for the comment box */
-            border-radius: 5px;
-            padding: 15px;
+        .wallet-info {
             margin-top: 20px;
-            /* Space above the comment box */
             color: #00FF00;
-            /* Neon green text color */
             text-shadow: 0 0 5px #00FF00;
-            /* Neon glow effect */
-        }
-
-        .comment-title {
-            font-size: 20px;
-            /* Title font size */
-            font-weight: bold;
-            margin-bottom: 10px;
-            /* Space below the title */
-        }
-
-        .comment {
-            margin-bottom: 10px;
-            /* Space between comments */
-        }
-
-        .reply-to-reply {
-            color: #FFA500;
-            /* Bright orange text color */
-            text-shadow:
-                0 0 5px #FFA500,
-                /* Orange glow */
-                0 0 10px #FFA500,
-                /* Stronger glow */
-                0 0 15px #FF4500;
-            /* Slightly darker orange for depth */
-            font-style: italic;
-            /* Optional: make it italic for differentiation */
-            margin-left: 20px;
-            /* Optional: indent to show it's a reply */
-        }
-
-        .comment-content {
-            font-size: 38px;
-            /* Adjust the size as needed */
-            font-weight: bold;
-            /* Optional: make it bold */
-            color: #00FF00;
-            /* Optional: change color if desired */
         }
     </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Wander Wallet Connection</h1>
+        <button id="wanderBtn" class="wander-btn">Connect to Wander</button>
+        <div id="walletInfo" class="wallet-info"></div>
+    </div>
+
+    <script>
+        const wanderBtn = document.getElementById("wanderBtn");
+        const walletInfo = document.getElementById("walletInfo");
+        let currentAddress = null;
+
+        function checkWander() {
+            if (!window.arweaveWallet) {
+                alert("❗ No se detecta Wander. Instala la extensión desde la Chrome Web Store.");
+                return false;
+            }
+            return true;
+        }
+
+        async function connectWander() {
+            if (!checkWander()) return;
+
+            try {
+                await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
+                currentAddress = await window.arweaveWallet.getActiveAddress();
+                wanderBtn.textContent = "Disconnect";
+                wanderBtn.classList.add("connected");
+                walletInfo.textContent = `Connected: ${currentAddress}`;
+                console.log("✅ Connected to Wander:", currentAddress);
+            } catch (err) {
+                console.error("Connection error:", err);
+                alert("Error connecting: " + err.message);
+            }
+        }
+
+        async function disconnectWander() {
+            try {
+                await window.arweaveWallet.disconnect();
+                currentAddress = null;
+                wanderBtn.textContent = "Connect to Wander";
+                wanderBtn.classList.remove("connected");
+                walletInfo.textContent = "";
+                console.log("🔌 Disconnected from Wander");
+            } catch (err) {
+                console.error("Disconnect error:", err);
+            }
+        }
+
+        wanderBtn.addEventListener("click", () => {
+            if (currentAddress) disconnectWander();
+            else connectWander();
+        });
+    </script>
+</body>
 </html>
