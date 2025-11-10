@@ -236,14 +236,14 @@
           protocol: 'https'
         });
         
-        out("🔍 DEBUG: Arweave inicializado", { 
+        out("🔍 DEBUG: Explorando API de Arweave...", { 
           hasTransactions: !!arweave.transactions,
-          hasTransaction: !!arweave.transactions.Transaction
+          transactionsMethods: Object.keys(arweave.transactions || {})
         });
         
-        // Crear objeto Transaction desde JSON
-        const transaction = new arweave.transactions.Transaction(tx);
-        const result = await arweave.transactions.verify(transaction);
+        // Usar el método correcto de la API
+        // En lugar de new Transaction(), usamos el objeto tal cual
+        const result = await arweave.transactions.verify(tx);
         
         out("🔍 DEBUG: Resultado de verificación criptográfica", { valid: result });
         return result;
