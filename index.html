@@ -1,115 +1,107 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Wander Manual Sign Flow</title>
-  <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #111;
-      color: #eee;
-      padding: 20px;
-    }
-    button {
-      margin: 8px;
-      padding: 10px 18px;
-      background: #4a90e2;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    pre {
-      background: #222;
-      padding: 10px;
-      border-radius: 6px;
-      overflow-x: auto;
-    }
-  </style>
+  <title>Wander Manual Sign Debug</title>
 </head>
 <body>
-  <h2>Conexión manual a Wander / Arweave</h2>
-
+  <h2>🧩 Wander Manual Sign Debug</h2>
   <button id="connectBtn">Conectar con Wander</button>
-  <button id="genTxBtn" disabled>Generar firmar.json</button>
-  <input type="file" id="uploadFile" style="display:none" accept=".json"/>
-  <button id="uploadBtn" disabled>Subir archivo firmado</button>
-
-  <pre id="log"></pre>
+  <button id="generateBtn" disabled>Generar firmar.json</button>
+  <input type="file" id="fileInput" accept=".json" />
+  <pre id="output"></pre>
 
   <script>
-    const log = (msg, obj) => {
-      const pre = document.getElementById("log");
-      pre.textContent += msg + (obj ? "\\n" + JSON.stringify(obj, null, 2) : "") + "\\n\\n";
+    const out = (msg, data) => {
+      const pre = document.getElementById("output");
+      pre.textContent += "\n" + msg + (data ? "\n" + JSON.stringify(data, null, 2) : "");
     };
 
-    let arweave = Arweave.init({ host: "arweave.net", protocol: "https" });
-    let wanderConnected = false;
+    const connectBtn = document.getElementById("connectBtn");
+    const generateBtn = document.getElementById("generateBtn");
+    const fileInput = document.getElementById("fileInput");
 
-    // 1️⃣ Conectar con Wander
-    document.getElementById("connectBtn").onclick = async () => {
+    let address = null;
+
+    connectBtn.onclick = async () => {
+      if (!window.arweaveWallet) {
+        alert("Instala la extensión Wander primero.");
+        return;
+      }
       try {
         await window.arweaveWallet.connect(["ACCESS_ADDRESS"]);
-        const addr = await window.arweaveWallet.getActiveAddress();
-        wanderConnected = true;
-        log("✅ Conectado a Wander", { address: addr });
-        document.getElementById("genTxBtn").disabled = false;
-      } catch (err) {
-        log("❌ Error al conectar", { error: err.message });
+        address = await window.arweaveWallet.getActiveAddress();
+        out("✅ Conectado con Wander", { address });
+        generateBtn.disabled = false;
+      } catch (e) {
+        out("❌ Error al conectar", { error: e.message });
       }
     };
 
-    // 2️⃣ Generar transacción sin firmar y descargarla
-    document.getElementById("genTxBtn").onclick = async () => {
-      if (!wanderConnected) return alert("Primero conecta la wallet");
-
-      const tx = await arweave.createTransaction({
-        data: "Conectar sesión manual"
-      });
-
-      tx.addTag("App-Name", "ManualLogin");
-      tx.addTag("Content-Type", "text/plain");
-      delete tx.signature;
-      delete tx.id;
-
+    // Genera JSON sin firmar
+    generateBtn.onclick = async () => {
+      const tx = {
+        format: 2,
+        owner: "",
+        target: "",
+        quantity: "0",
+        data: btoa("login-request-" + Date.now()),
+        reward: "0",
+        last_tx: "",
+        tags: [
+          { name: "App-Name", value: "ManualLogin" },
+          { name: "Content-Type", value: "text/plain" },
+        ],
+      };
       const blob = new Blob([JSON.stringify(tx, null, 2)], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "firmar.json";
       a.click();
-
-      log("📤 Transacción generada. Descarga firmar.json, fírmala externamente y súbela después.");
-      document.getElementById("uploadBtn").disabled = false;
+      out("📄 Archivo generado: firmar.json");
     };
 
-    // 3️⃣ Subir archivo firmado
-    document.getElementById("uploadBtn").onclick = () => {
-      document.getElementById("uploadFile").click();
-    };
-
-    document.getElementById("uploadFile").onchange = async (e) => {
+    // Cargar archivo firmado
+    fileInput.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const content = await file.text();
-      const tx = JSON.parse(content);
-
+      const text = await file.text();
       try {
-        // Verificar firma
-        const valid = await arweave.transactions.verify(tx);
-        if (!valid) throw new Error("Firma inválida");
+        const tx = JSON.parse(text);
+        out("📂 Archivo firmado cargado", tx);
+        if (!tx.signature) {
+          out("❌ No contiene firma");
+          return;
+        }
 
-        // Obtener dirección pública desde el 'owner'
-        const addr = await arweave.wallets.ownerToAddress(tx.owner);
-        log("✅ Archivo firmado válido. Dirección extraída:", { address: addr });
-
-        // Subir a la red (si quieres “loguearte” y registrar)
-        const res = await arweave.transactions.post(tx);
-        log("📡 Transacción subida a Arweave", { status: res.status, id: tx.id });
+        // Verificar firma (solo si arweave.js está disponible)
+        out("⚙️ Verificando firma...");
+        const valid = await verifySignature(tx);
+        if (valid) {
+          out("✅ Firma válida. Dirección verificada: " + address);
+        } else {
+          out("❌ Firma inválida");
+        }
       } catch (err) {
-        log("❌ Error al verificar o subir", { error: err.message });
+        out("❌ Error al leer JSON", { error: err.message });
       }
     };
+
+    async function verifySignature(tx) {
+      try {
+        // cargar arweave-js dinamicamente
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/arweave@1.14.4/bundles/web.bundle.min.js";
+        document.body.appendChild(script);
+        await new Promise(r => script.onload = r);
+
+        const arweave = window.Arweave.init();
+        return await arweave.transactions.verify(tx);
+      } catch (e) {
+        out("⚠️ No se pudo verificar la firma", { error: e.message });
+        return false;
+      }
+    }
   </script>
 </body>
 </html>
