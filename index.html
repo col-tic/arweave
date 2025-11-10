@@ -1,345 +1,80 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connect to Wander - Debug Terminal</title>
-    <style>
-        body {
-            font-family: 'Courier New', Courier, monospace;
-            background-color: #000;
-            margin: 0;
-            padding: 20px;
-            color: #00FF00;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            text-align: center;
-            margin-bottom: 30px;
-            text-shadow: 0 0 10px #00FF00;
-        }
-
-        .controls {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .wander-btn {
-            background: none;
-            color: #37006b;
-            font-size: 18px;
-            border: 2px solid #37006b;
-            padding: 12px 25px;
-            text-shadow: 0 0 5px #37006b;
-            font-family: 'Courier New', Courier, monospace;
-            cursor: pointer;
-            border-radius: 5px;
-            transition: all 0.3s;
-            margin: 5px;
-        }
-
-        .wander-btn:hover {
-            background-color: #37006b;
-            color: #000;
-        }
-
-        .wander-btn.connected {
-            color: #00FF00;
-            border-color: #00FF00;
-            text-shadow: 0 0 5px #00FF00;
-        }
-
-        .wander-btn.connected:hover {
-            background-color: #00FF00;
-            color: #000;
-        }
-
-        .test-btn {
-            background: none;
-            color: #FF6600;
-            font-size: 16px;
-            border: 2px solid #FF6600;
-            padding: 10px 20px;
-            text-shadow: 0 0 5px #FF6600;
-            font-family: 'Courier New', Courier, monospace;
-            cursor: pointer;
-            border-radius: 5px;
-            transition: all 0.3s;
-            margin: 5px;
-        }
-
-        .test-btn:hover {
-            background-color: #FF6600;
-            color: #000;
-        }
-
-        .test-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .wallet-info {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #00FF00;
-            text-shadow: 0 0 5px #00FF00;
-            font-size: 14px;
-        }
-
-        .terminal {
-            background-color: #0a0a0a;
-            border: 2px solid #00FF00;
-            border-radius: 5px;
-            padding: 20px;
-            height: 500px;
-            overflow-y: auto;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
-        }
-
-        .terminal-header {
-            color: #00FF00;
-            font-weight: bold;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #00FF00;
-        }
-
-        .log-entry {
-            margin: 8px 0;
-            padding: 8px;
-            border-left: 3px solid #00FF00;
-            background-color: #111;
-        }
-
-        .log-entry.sent {
-            border-left-color: #0099FF;
-            color: #0099FF;
-        }
-
-        .log-entry.received {
-            border-left-color: #00FF00;
-            color: #00FF00;
-        }
-
-        .log-entry.error {
-            border-left-color: #FF0000;
-            color: #FF0000;
-        }
-
-        .log-entry.info {
-            border-left-color: #FFD700;
-            color: #FFD700;
-        }
-
-        .timestamp {
-            color: #666;
-            font-size: 12px;
-        }
-
-        .log-content {
-            margin-top: 5px;
-            white-space: pre-wrap;
-            word-break: break-all;
-            font-size: 13px;
-        }
-
-        .json-view {
-            background-color: #0a0a0a;
-            padding: 10px;
-            margin-top: 5px;
-            border-radius: 3px;
-            font-size: 12px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Wander Debug</title>
 </head>
 <body>
-    <div class="container">
-        <h1>🔐 Wander Wallet Connection - Debug Terminal</h1>
-        
-        <div class="controls">
-            <button id="wanderBtn" class="wander-btn">Connect to Wander</button>
-            <button id="testBtn" class="test-btn" disabled>Send Test Transaction</button>
-            <button id="clearBtn" class="test-btn">Clear Terminal</button>
-        </div>
+  <h2>Wander Wallet Debug</h2>
+  <button id="connect">Connect</button>
+  <button id="test" disabled>Send Test TX</button>
+  <pre id="log"></pre>
 
-        <div id="walletInfo" class="wallet-info"></div>
+  <script>
+    const log = (...args) => {
+      console.log(...args);
+      document.getElementById("log").textContent += args.join(" ") + "\n";
+    };
 
-        <div class="terminal">
-            <div class="terminal-header">📡 COMMUNICATION TERMINAL</div>
-            <div id="terminalContent"></div>
-        </div>
-    </div>
+    const connectBtn = document.getElementById("connect");
+    const testBtn = document.getElementById("test");
+    let connected = false;
 
-    <script>
-        const wanderBtn = document.getElementById("wanderBtn");
-        const testBtn = document.getElementById("testBtn");
-        const clearBtn = document.getElementById("clearBtn");
-        const walletInfo = document.getElementById("walletInfo");
-        const terminalContent = document.getElementById("terminalContent");
-        let currentAddress = null;
+    function checkWallet() {
+      if (!window.arweaveWallet) {
+        log("❌ Wander not detected. Install or refresh.");
+        alert("No Wander wallet detected.");
+        return false;
+      }
+      log("✅ Wander wallet detected.");
+      return true;
+    }
 
-        // Logging functions
-        function getTimestamp() {
-            const now = new Date();
-            return now.toLocaleTimeString() + '.' + now.getMilliseconds();
-        }
+    async function connect() {
+      if (!checkWallet()) return;
 
-        function addLog(type, message, data = null) {
-            const logEntry = document.createElement('div');
-            logEntry.className = `log-entry ${type}`;
-            
-            const timestamp = document.createElement('span');
-            timestamp.className = 'timestamp';
-            timestamp.textContent = `[${getTimestamp()}] `;
-            
-            const content = document.createElement('div');
-            content.className = 'log-content';
-            content.textContent = message;
-            
-            logEntry.appendChild(timestamp);
-            logEntry.appendChild(content);
-            
-            if (data) {
-                const jsonView = document.createElement('div');
-                jsonView.className = 'json-view';
-                jsonView.textContent = JSON.stringify(data, null, 2);
-                logEntry.appendChild(jsonView);
-            }
-            
-            terminalContent.appendChild(logEntry);
-            terminalContent.scrollTop = terminalContent.scrollHeight;
-        }
+      try {
+        log("🔌 Connecting...");
+        await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
+        const addr = await window.arweaveWallet.getActiveAddress();
+        log("✅ Connected:", addr);
+        connected = true;
+        connectBtn.textContent = "Disconnect";
+        testBtn.disabled = false;
+      } catch (e) {
+        log("❌ Connect error:", e.message);
+      }
+    }
 
-        function checkWander() {
-            if (!window.arweaveWallet) {
-                addLog('error', '❌ ERROR: Wander extension not detected');
-                alert("❗ No se detecta Wander. Instala la extensión desde la Chrome Web Store.");
-                return false;
-            }
-            addLog('info', '✓ Wander extension detected');
-            return true;
-        }
+    async function disconnect() {
+      try {
+        await window.arweaveWallet.disconnect();
+        log("🔌 Disconnected.");
+      } catch (e) {
+        log("❌ Disconnect error:", e.message);
+      }
+      connected = false;
+      connectBtn.textContent = "Connect";
+      testBtn.disabled = true;
+    }
 
-        async function connectWander() {
-            if (!checkWander()) return;
-
-            addLog('sent', '📤 SENDING: Connection request to Wander', {
-                permissions: ["ACCESS_ADDRESS", "DISPATCH"]
-            });
-
-            try {
-                await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
-                
-                addLog('received', '📥 RECEIVED: Connection accepted by user');
-                
-                currentAddress = await window.arweaveWallet.getActiveAddress();
-                
-                addLog('received', '📥 RECEIVED: Active address', {
-                    address: currentAddress
-                });
-
-                wanderBtn.textContent = "Disconnect";
-                wanderBtn.classList.add("connected");
-                testBtn.disabled = false;
-                walletInfo.textContent = `Connected: ${currentAddress}`;
-                
-                addLog('info', '✅ CONNECTION ESTABLISHED');
-                
-            } catch (err) {
-                addLog('error', '❌ ERROR: Connection failed', {
-                    error: err.message,
-                    stack: err.stack
-                });
-                alert("Error connecting: " + err.message);
-            }
-        }
-
-        async function disconnectWander() {
-            addLog('sent', '📤 SENDING: Disconnect request');
-            
-            try {
-                await window.arweaveWallet.disconnect();
-                currentAddress = null;
-                wanderBtn.textContent = "Connect to Wander";
-                wanderBtn.classList.remove("connected");
-                testBtn.disabled = true;
-                walletInfo.textContent = "";
-                
-                addLog('info', '🔌 DISCONNECTED from Wander');
-                
-            } catch (err) {
-                addLog('error', '❌ ERROR: Disconnect failed', {
-                    error: err.message
-                });
-            }
-        }
-
-        async function sendTestTransaction() {
-            if (!currentAddress) {
-                addLog('error', '❌ ERROR: No wallet connected');
-                return;
-            }
-
-            const testData = {
-                data: "Test message from debug terminal - " + new Date().toISOString(),
-                tags: [
-                    { name: 'Content-Type', value: 'text/plain' },
-                    { name: 'App-Name', value: 'WanderDebugTerminal' },
-                    { name: 'Type', value: 'test' },
-                    { name: 'Timestamp', value: Date.now().toString() }
-                ]
-            };
-
-            addLog('sent', '📤 SENDING: Transaction to Wander for signing', testData);
-
-            try {
-                const result = await window.arweaveWallet.dispatch(testData);
-                
-                addLog('received', '📥 RECEIVED: Signed transaction from Wander', {
-                    transactionId: result.id,
-                    type: result.type || 'BUNDLED'
-                });
-
-                addLog('info', '✅ TRANSACTION SIGNED SUCCESSFULLY', {
-                    txId: result.id,
-                    note: 'Transaction submitted to Arweave network'
-                });
-
-                alert(`✅ Transaction signed!\nTX ID: ${result.id}\n\nCheck the terminal for details.`);
-
-            } catch (err) {
-                addLog('error', '❌ ERROR: Transaction failed', {
-                    error: err.message,
-                    stack: err.stack
-                });
-                alert("Error signing transaction: " + err.message);
-            }
-        }
-
-        function clearTerminal() {
-            terminalContent.innerHTML = '<div class="terminal-header">📡 COMMUNICATION TERMINAL</div>';
-            addLog('info', '🗑️ Terminal cleared');
-        }
-
-        // Event listeners
-        wanderBtn.addEventListener("click", () => {
-            if (currentAddress) disconnectWander();
-            else connectWander();
+    async function sendTestTx() {
+      try {
+        log("🧪 Creating test transaction...");
+        const tx = await window.arweaveWallet.dispatch({
+          data: "Hello from debug " + Date.now(),
+          tags: [{ name: "Content-Type", value: "text/plain" }]
         });
+        log("✅ TX sent:", tx.id);
+      } catch (e) {
+        log("❌ TX error:", e.message);
+      }
+    }
 
-        testBtn.addEventListener("click", sendTestTransaction);
-        clearBtn.addEventListener("click", clearTerminal);
+    connectBtn.onclick = () => connected ? disconnect() : connect();
+    testBtn.onclick = sendTestTx;
 
-        // Initial log
-        addLog('info', '🚀 Debug terminal initialized');
-        addLog('info', '💡 Click "Connect to Wander" to begin');
-    </script>
+    log("🚀 Wander debug ready. Click Connect.");
+  </script>
 </body>
 </html>
