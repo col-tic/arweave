@@ -1,24 +1,107 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Login con firma Arweave</title>
+  <meta charset="UTF-8">
+  <title>Login seguro con Arweave</title>
+  <script type="module" src="https://esm.sh/arweave"></script>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f6fa;
+      padding: 2rem;
+      color: #222;
+    }
+    h2 { color: #444; }
+    button {
+      background: #4a6cf7;
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      margin: 0.3rem;
+      cursor: pointer;
+    }
+    button:hover { background: #3952d4; }
+    input[type=file] { margin-top: 1rem; }
+    pre {
+      background: #222;
+      color: #0f0;
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      height: 200px;
+    }
+  </style>
 </head>
 <body>
-  <h2>Autenticación segura (firma fuera de línea)</h2>
 
+  <h1>🔐 Sistema de login seguro Arweave</h1>
+
+  <h2>Método 1: ArConnect / Wallet del navegador</h2>
+  <button id="login-wallet">Conectarse con wallet</button>
+
+  <h2>Método 2: Firma externa (Python)</h2>
   <button id="generar">🧾 Generar archivo para firmar</button>
-  <br><br>
-  <input type="file" id="upload" accept=".json" />
+  <br>
+  <input type="file" id="upload" accept=".json">
+
+  <h3>Logs</h3>
+  <pre id="log"></pre>
 
   <script type="module">
-    // Importar Arweave sólo si luego verificas firmas
     import Arweave from "https://esm.sh/arweave";
 
     const arweave = Arweave.init();
+    const logBox = document.getElementById("log");
+    const log = (...msg) => {
+      console.log(...msg);
+      logBox.textContent += msg.join(" ") + "\n";
+      logBox.scrollTop = logBox.scrollHeight;
+    };
+
     let sessionNonce = null;
 
-    // --- Generar archivo firmar.json ---
+    // ------------------------
+    // MÉTODO 1: ArConnect
+    // ------------------------
+    const btnWallet = document.getElementById("login-wallet");
+    btnWallet.onclick = async () => {
+      if (!window.arweaveWallet) {
+        log("❌ No se detectó ArConnect.");
+        alert("Instala la extensión ArConnect para usar este método.");
+        return;
+      }
+
+      try {
+        await window.arweaveWallet.connect(["ACCESS_ADDRESS", "SIGNATURE"]);
+        const address = await window.arweaveWallet.getActiveAddress();
+        log("✅ Conectado con ArConnect:", address);
+
+        // Generar mensaje simple para firmar
+        const msg = `login-${Date.now()}-${crypto.randomUUID()}`;
+        const data = new TextEncoder().encode(msg);
+
+        const signature = await window.arweaveWallet.signature(data, {
+          name: "RSA-PSS",
+          saltLength: 32,
+        });
+
+        const pubkey = await window.arweaveWallet.getActivePublicKey();
+        const verified = await arweave.crypto.verify(pubkey, data, signature);
+
+        if (verified) {
+          log("✅ Firma verificada correctamente.");
+        } else {
+          log("❌ Firma inválida.");
+        }
+      } catch (err) {
+        log("❌ Error con wallet:", err);
+      }
+    };
+
+    // ------------------------
+    // MÉTODO 2: Firma externa (Python)
+    // ------------------------
     document.getElementById("generar").onclick = () => {
       sessionNonce = crypto.randomUUID();
       const timestamp = Date.now();
@@ -28,48 +111,53 @@
         nonce: sessionNonce,
         timestamp,
         tags: [
-          { name: "App-Name", value: "MiDApp" },
-          { name: "Login-Type", value: "Signature" },
-          { name: "Content-Type", value: "application/json" },
+          { name: "App-Name", value: "DemoLogin" },
+          { name: "Login-Type", value: "ExternalSignature" },
         ],
       };
 
-      // Crear blob con el JSON
       const jsonStr = JSON.stringify(data, null, 2);
       const blob = new Blob([jsonStr], { type: "application/json" });
-
-      // Crear enlace de descarga
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "firmar.json";
       a.style.display = "none";
       document.body.appendChild(a);
-      a.click(); // Forzar descarga
+      a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
 
-      console.log("✅ firmar.json generado y descargado");
-      console.log(data);
+      log("📄 Archivo firmar.json generado.");
+      log(JSON.stringify(data, null, 2));
     };
 
-    // --- Cargar archivo firmado ---
+    // Cargar archivo firmado desde Python
     document.getElementById("upload").onchange = async (e) => {
       const file = e.target.files[0];
       const text = await file.text();
-      const txData = JSON.parse(text);
+      const tx = JSON.parse(text);
 
-      console.log("📂 Archivo cargado:", txData);
+      log("📂 Archivo firmado cargado.");
+      log(JSON.stringify(tx, null, 2));
 
-      // Validar si tiene campo 'data' con JSON original
-      if (txData.data) {
-        const original = JSON.parse(txData.data);
-        if (original.nonce === sessionNonce) {
-          console.log("✅ Nonce válido. Usuario autenticado.");
-        } else {
-          console.error("❌ Nonce inválido.");
+      try {
+        // Verificar nonce
+        if (!tx.data) throw new Error("Campo 'data' ausente.");
+        const decoded = JSON.parse(tx.data);
+        if (decoded.nonce !== sessionNonce) {
+          log("❌ Nonce inválido o sesión distinta.");
+          return;
         }
-      } else {
-        console.error("❌ Archivo inválido o no firmado.");
+
+        // Verificar firma con arweave-js
+        const ok = await arweave.transactions.verify(tx);
+        if (ok) {
+          log("✅ Firma criptográfica válida.");
+        } else {
+          log("❌ Firma criptográfica inválida.");
+        }
+      } catch (err) {
+        log("❌ Error verificando:", err.message);
       }
     };
   </script>
