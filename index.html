@@ -2,79 +2,94 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Wander Debug</title>
+  <title>Wander Debug Terminal</title>
 </head>
 <body>
-  <h2>Wander Wallet Debug</h2>
-  <button id="connect">Connect</button>
-  <button id="test" disabled>Send Test TX</button>
-  <pre id="log"></pre>
+  <h2>🧠 Wander Wallet Debug Terminal</h2>
+  <button id="connect">Connect Wallet</button>
+  <button id="test" disabled>Send Test Transaction</button>
+  <button id="clear">Clear</button>
+  <pre id="terminal" style="background:#000;color:#0f0;padding:10px;height:400px;overflow:auto;"></pre>
 
   <script>
-    const log = (...args) => {
-      console.log(...args);
-      document.getElementById("log").textContent += args.join(" ") + "\n";
-    };
-
+    const terminal = document.getElementById("terminal");
     const connectBtn = document.getElementById("connect");
     const testBtn = document.getElementById("test");
+    const clearBtn = document.getElementById("clear");
     let connected = false;
+
+    function log(type, msg, data) {
+      const time = new Date().toLocaleTimeString();
+      let entry = `[${time}] ${type.toUpperCase()}: ${msg}`;
+      if (data) entry += "\n" + JSON.stringify(data, null, 2);
+      terminal.textContent += entry + "\n\n";
+      terminal.scrollTop = terminal.scrollHeight;
+      console.log(type, msg, data || "");
+    }
 
     function checkWallet() {
       if (!window.arweaveWallet) {
-        log("❌ Wander not detected. Install or refresh.");
-        alert("No Wander wallet detected.");
+        log("error", "Wander wallet not detected");
         return false;
       }
-      log("✅ Wander wallet detected.");
+      log("info", "Wander wallet detected");
       return true;
     }
 
     async function connect() {
       if (!checkWallet()) return;
-
       try {
-        log("🔌 Connecting...");
+        log("send", "Connecting to Wander...", { permissions: ["ACCESS_ADDRESS", "DISPATCH"] });
         await window.arweaveWallet.connect(["ACCESS_ADDRESS", "DISPATCH"]);
         const addr = await window.arweaveWallet.getActiveAddress();
-        log("✅ Connected:", addr);
-        connected = true;
+        log("recv", "Connected", { address: addr });
         connectBtn.textContent = "Disconnect";
+        connected = true;
         testBtn.disabled = false;
       } catch (e) {
-        log("❌ Connect error:", e.message);
+        log("error", "Connection failed", { message: e.message });
       }
     }
 
     async function disconnect() {
       try {
         await window.arweaveWallet.disconnect();
-        log("🔌 Disconnected.");
+        log("info", "Disconnected");
       } catch (e) {
-        log("❌ Disconnect error:", e.message);
+        log("error", "Disconnect failed", { message: e.message });
       }
       connected = false;
-      connectBtn.textContent = "Connect";
+      connectBtn.textContent = "Connect Wallet";
       testBtn.disabled = true;
     }
 
     async function sendTestTx() {
       try {
-        log("🧪 Creating test transaction...");
-        const tx = await window.arweaveWallet.dispatch({
-          data: "Hello from debug " + Date.now(),
-          tags: [{ name: "Content-Type", value: "text/plain" }]
-        });
-        log("✅ TX sent:", tx.id);
+        const tx = {
+          data: "Debug " + Date.now(),
+          tags: [
+            { name: "App-Name", value: "WanderDebug" },
+            { name: "Content-Type", value: "text/plain" }
+          ]
+        };
+        log("send", "Dispatching TX", tx);
+        const res = await window.arweaveWallet.dispatch(tx);
+        log("recv", "TX Signed", res);
       } catch (e) {
-        log("❌ TX error:", e.message);
+        log("error", "TX Failed", { message: e.message });
       }
     }
 
     connectBtn.onclick = () => connected ? disconnect() : connect();
     testBtn.onclick = sendTestTx;
+    clearBtn.onclick = () => { terminal.textContent = ""; };
 
-    log("🚀 Wander debug ready. Click Connect.");
+    window.addEventListener("arweaveWalletLoaded", () => {
+      log("info", "arweaveWalletLoaded event detected ✅");
+    });
+
+    log("info", "Wander Debug Terminal ready. Click 'Connect Wallet' to start.");
   </script>
 </body>
 </html>
+
