@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Login con firma Arweave</title>
 </head>
 <body>
-  <h2>Autenticación segura</h2>
-  
-  <button id="generar">Generar archivo para firmar</button>
+  <h2>Autenticación segura (firma fuera de línea)</h2>
+
+  <button id="generar">🧾 Generar archivo para firmar</button>
+  <br><br>
   <input type="file" id="upload" accept=".json" />
-  
+
   <script type="module">
+    // Importar Arweave sólo si luego verificas firmas
     import Arweave from "https://esm.sh/arweave";
 
     const arweave = Arweave.init();
     let sessionNonce = null;
 
+    // --- Generar archivo firmar.json ---
     document.getElementById("generar").onclick = () => {
       sessionNonce = crypto.randomUUID();
       const timestamp = Date.now();
@@ -31,14 +34,25 @@
         ],
       };
 
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      // Crear blob con el JSON
+      const jsonStr = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json" });
+
+      // Crear enlace de descarga
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "firmar.json";
-      a.click();
-      console.log("✅ firmar.json generado");
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click(); // Forzar descarga
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+
+      console.log("✅ firmar.json generado y descargado");
+      console.log(data);
     };
 
+    // --- Cargar archivo firmado ---
     document.getElementById("upload").onchange = async (e) => {
       const file = e.target.files[0];
       const text = await file.text();
@@ -46,16 +60,16 @@
 
       console.log("📂 Archivo cargado:", txData);
 
+      // Validar si tiene campo 'data' con JSON original
       if (txData.data) {
-        console.log("🔍 Validando nonce...");
-        const parsedData = JSON.parse(txData.data);
-        if (parsedData.nonce === sessionNonce) {
+        const original = JSON.parse(txData.data);
+        if (original.nonce === sessionNonce) {
           console.log("✅ Nonce válido. Usuario autenticado.");
         } else {
-          console.error("❌ Nonce inválido. Firma no coincide.");
+          console.error("❌ Nonce inválido.");
         }
       } else {
-        console.error("❌ Archivo inválido o no firmado correctamente.");
+        console.error("❌ Archivo inválido o no firmado.");
       }
     };
   </script>
