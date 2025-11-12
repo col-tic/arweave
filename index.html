@@ -1,79 +1,39 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8">
 <title>Wander Connect Debug</title>
-<style>
-  body{font-family:monospace;background:#000;color:#0f0;margin:0;padding:20px}
-  h1{text-align:center;text-shadow:0 0 10px #00FF00}
-  .ribbon{background:#111;padding:12px;border-radius:6px;text-align:center;margin-bottom:10px}
-  button{background:none;border:2px solid #00FF00;color:#00FF00;padding:10px 18px;border-radius:6px;cursor:pointer;margin:5px}
-  button:hover{background:#00FF00;color:#000}
-  #terminal{background:#060606;border:1px solid #003300;color:#A6FFA6;padding:10px;height:400px;overflow:auto;white-space:pre-wrap;margin-top:10px;border-radius:6px}
-  .method-section{background:#111;padding:15px;border-radius:6px;margin-bottom:10px;border:1px solid #003300}
-  .method-title{color:#00FF00;font-weight:bold;font-size:16px;margin-bottom:10px}
-</style>
 <script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
 </head>
 <body>
-  <h1>Wander Connect — Debug</h1>
-  
-  <div class="method-section">
-    <div class="method-title">MÉTODO 1: Conexión Directa con Wander Extension</div>
-    <button id="connectBtn">Connect to Wander</button>
-  </div>
 
-  <div class="method-section">
-    <div class="method-title">MÉTODO 2: Firma Offline (Descargar/Cargar JSON)</div>
-    <button id="generateJsonBtn">1. Generar JSON para firmar</button>
-    <button id="uploadSignedBtn">2. Cargar JSON firmado</button>
-    <input type="file" id="fileInput" accept=".json" style="display:none">
-  </div>
+<h1>Wander Connect — Debug</h1>
 
-  <div id="terminal">[INFO] Terminal iniciado…</div>
+<div>
+  <h2>MÉTODO 2: Firma Offline (Descargar/Cargar JSON)</h2>
+  <button id="generateJsonBtn">1. Generar JSON para firmar</button>
+  <button id="uploadSignedBtn">2. Cargar JSON firmado</button>
+  <input type="file" id="fileInput" accept=".json" style="display:none">
+</div>
+
+<pre id="terminal">[INFO] Terminal iniciado…</pre>
 
 <script>
 const term = document.getElementById('terminal');
+
 function log(msg, type='info') {
   const ts = new Date().toISOString();
-  const color = type==='err' ? '#FF5555' : type==='event' ? '#55FFFF' : '#A6FFA6';
-  term.innerHTML += `\n<span style="color:${color}">${ts} [${type.toUpperCase()}] ${msg}</span>`;
+  term.textContent += `\n[${ts}][${type.toUpperCase()}] ${msg}`;
   term.scrollTop = term.scrollHeight;
 }
 
-// Detect if wallet is installed
-if (!window.arweaveWallet) {
-  log('❌ Wander wallet no detectada. Instálala primero desde Chrome Web Store.', 'err');
-} else {
-  log('✅ Wander wallet detectada. Listo para conectar.', 'info');
-}
-
 // ============================================
-// MÉTODO 1: Conexión directa con Wander
-// ============================================
-document.getElementById('connectBtn').addEventListener('click', async () => {
-  try {
-    log('Solicitando conexión a Wander...', 'event');
-    const perms = ["ACCESS_ADDRESS", "SIGN_TRANSACTION"];
-    const res = await window.arweaveWallet.connect(perms);
-    log('Respuesta connect() => ' + JSON.stringify(res, null, 2), 'info');
-    const addr = await window.arweaveWallet.getActiveAddress();
-    log('Dirección activa => ' + addr, 'info');
-  } catch (e) {
-    log('Error durante conexión => ' + e.message, 'err');
-    console.error(e);
-  }
-});
-
-// ============================================
-// MÉTODO 2: Generar JSON para firmar offline
+// GENERAR JSON PARA FIRMAR OFFLINE
 // ============================================
 document.getElementById('generateJsonBtn').addEventListener('click', async () => {
   try {
     log('Generando JSON para firma de autenticación...', 'event');
     
-    // Crear mensaje de autenticación simple
     const timestamp = Date.now();
     const authMessage = {
       app: 'WanderConnect',
@@ -82,13 +42,8 @@ document.getElementById('generateJsonBtn').addEventListener('click', async () =>
       message: 'Firma este mensaje para autenticarte en WanderConnect'
     };
     
-    // Crear objeto para firmar
-    const firmarJson = {
-      data: authMessage,
-      timestamp: timestamp
-    };
+    const firmarJson = { data: authMessage, timestamp: timestamp };
     
-    // Crear blob y descargar
     const blob = new Blob([JSON.stringify(firmarJson, null, 2)], {type: 'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -100,53 +55,7 @@ document.getElementById('generateJsonBtn').addEventListener('click', async () =>
     URL.revokeObjectURL(url);
     
     log('✅ Archivo firmar.json descargado', 'info');
-    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-    log('INSTRUCCIONES PARA FIRMAR EN PC:', 'event');
-    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-    log('1. Instala: pip install arweave-python-client', 'info');
-    log('2. Ejecuta este código Python:', 'info');
-    log('', 'info');
-    log('import arweave', 'info');
-    log('import json', 'info');
-    log('', 'info');
-    log('# Cargar wallet', 'info');
-    log('wallet = arweave.Wallet("tu_wallet.json")', 'info');
-    log('', 'info');
-    log('# Cargar datos a firmar', 'info');
-    log('with open("firmar.json", "r") as f:', 'info');
-    log('    data_to_sign = json.load(f)', 'info');
-    log('', 'info');
-    log('# Crear transacción de datos (sin transferir AR)', 'info');
-    log('transaction = arweave.Transaction(', 'info');
-    log('    wallet,', 'info');
-    log('    data=json.dumps(data_to_sign["data"])', 'info');
-    log(')', 'info');
-    log('', 'info');
-    log('# Agregar tags', 'info');
-    log('transaction.add_tag("App-Name", "WanderConnect")', 'info');
-    log('transaction.add_tag("Type", "Authentication")', 'info');
-    log('transaction.add_tag("Timestamp", str(data_to_sign["timestamp"]))', 'info');
-    log('', 'info');
-    log('# Firmar transacción', 'info');
-    log('transaction.sign()', 'info');
-    log('', 'info');
-    log('# Guardar datos firmados', 'info');
-    log('signed_data = {', 'info');
-    log('    "id": transaction.id,', 'info');
-    log('    "owner": transaction.owner,', 'info');
-    log('    "signature": transaction.signature,', 'info');
-    log('    "data": data_to_sign["data"],', 'info');
-    log('    "address": wallet.address', 'info');
-    log('}', 'info');
-    log('', 'info');
-    log('with open("firmado.json", "w") as f:', 'info');
-    log('    json.dump(signed_data, f, indent=2)', 'info');
-    log('', 'info');
-    log('print(f"✅ Firmado! Address: {wallet.address}")', 'info');
-    log('print(f"TX ID: {transaction.id}")', 'info');
-    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-    log('3. Carga el archivo firmado.json aquí', 'event');
-    
+    log('Instrucciones: firma el archivo con tu wallet usando Python y luego cárgalo aquí', 'event');
   } catch (e) {
     log('Error generando JSON => ' + e.message, 'err');
     console.error(e);
@@ -154,7 +63,7 @@ document.getElementById('generateJsonBtn').addEventListener('click', async () =>
 });
 
 // ============================================
-// MÉTODO 2: Cargar JSON firmado
+// CARGAR JSON FIRMADO
 // ============================================
 document.getElementById('uploadSignedBtn').addEventListener('click', () => {
   document.getElementById('fileInput').click();
@@ -172,7 +81,6 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
     
     log('JSON cargado con éxito', 'info');
     
-    // Validar campos requeridos
     if (!signedData.signature) {
       log('❌ El JSON no contiene firma. Debes firmarlo primero con Python.', 'err');
       return;
@@ -184,34 +92,17 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
     }
     
     log('✅ Firma válida detectada', 'info');
-    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
     log('Dirección autenticada: ' + signedData.address, 'event');
     log('Signature ID: ' + signedData.id, 'info');
-    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-    
-    // Aquí podrías verificar la firma si es necesario
-    // Por ahora solo mostramos que la autenticación fue exitosa
-    
     log('✅ AUTENTICACIÓN EXITOSA', 'event');
-    log('El usuario ha sido autenticado correctamente', 'info');
-    log('Puedes proceder con las operaciones de tu aplicación', 'info');
-    
   } catch (e) {
     log('Error procesando JSON firmado => ' + e.message, 'err');
     console.error(e);
   }
   
-  // Reset input
   e.target.value = '';
 });
-
-// Opcional: escucha mensajes cruzados del wallet (por si manda eventos)
-window.addEventListener("message", ev => {
-  if (typeof ev.data === "object" && ev.data.type && ev.data.type.includes('arweave')) {
-    const data = JSON.stringify(ev.data, null, 2);
-    log("Mensaje postMessage capturado => " + data, "event");
-  }
-});
 </script>
+
 </body>
 </html>
