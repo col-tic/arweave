@@ -1,25 +1,27 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<title>Wander Connect Debug</title>
-<script src="https://unpkg.com/arweave/bundles/web.bundle.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Native Wallet Connect</title>
+<style>
+  body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+  h1 { text-align: center; }
+  button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #0f0; color: #000; border: none; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  pre { background: #111; padding: 10px; height: 300px; overflow: auto; }
+</style>
 </head>
 <body>
 
-<h1>Wander Connect — Debug</h1>
+<h1>Native Wallet Connect</h1>
 
-<div>
-  <h2>MÉTODO 2: Firma Offline (Descargar/Cargar JSON)</h2>
-  <button id="generateJsonBtn">1. Generar JSON para firmar</button>
-  <button id="uploadSignedBtn">2. Cargar JSON firmado</button>
-  <input type="file" id="fileInput" accept=".json" style="display:none">
-</div>
-
-<pre id="terminal">[INFO] Terminal iniciado…</pre>
+<button id="connectBtn">Conectar y enviar JSON</button>
+<pre id="terminal">[INFO] Terminal iniciado...</pre>
 
 <script>
 const term = document.getElementById('terminal');
+const connectBtn = document.getElementById('connectBtn');
 
 function log(msg, type='info') {
   const ts = new Date().toISOString();
@@ -27,80 +29,62 @@ function log(msg, type='info') {
   term.scrollTop = term.scrollHeight;
 }
 
-// ============================================
-// GENERAR JSON PARA FIRMAR OFFLINE
-// ============================================
-document.getElementById('generateJsonBtn').addEventListener('click', async () => {
-  try {
-    log('Generando JSON para firma de autenticación...', 'event');
-    
-    const timestamp = Date.now();
-    const authMessage = {
-      app: 'WanderConnect',
-      action: 'authenticate',
-      timestamp: timestamp,
-      message: 'Firma este mensaje para autenticarte en WanderConnect'
-    };
-    
-    const firmarJson = { data: authMessage, timestamp: timestamp };
-    
-    const blob = new Blob([JSON.stringify(firmarJson, null, 2)], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'firmar.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    log('✅ Archivo firmar.json descargado', 'info');
-    log('Instrucciones: firma el archivo con tu wallet usando Python y luego cárgalo aquí', 'event');
-  } catch (e) {
-    log('Error generando JSON => ' + e.message, 'err');
-    console.error(e);
-  }
-});
+// Generar JSON de autenticación
+function createAuthJSON() {
+  const timestamp = Date.now();
+  return {
+    app: "NativeWalletConnect",
+    action: "authenticate",
+    timestamp: timestamp,
+    data: { user: "demo" }
+  };
+}
 
-// ============================================
-// CARGAR JSON FIRMADO
-// ============================================
-document.getElementById('uploadSignedBtn').addEventListener('click', () => {
-  document.getElementById('fileInput').click();
-});
-
-document.getElementById('fileInput').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  
-  try {
-    log('Cargando JSON firmado...', 'event');
-    
-    const text = await file.text();
-    const signedData = JSON.parse(text);
-    
-    log('JSON cargado con éxito', 'info');
-    
-    if (!signedData.signature) {
-      log('❌ El JSON no contiene firma. Debes firmarlo primero con Python.', 'err');
-      return;
-    }
-    
-    if (!signedData.address) {
-      log('❌ El JSON no contiene la dirección de la wallet.', 'err');
-      return;
-    }
-    
-    log('✅ Firma válida detectada', 'info');
-    log('Dirección autenticada: ' + signedData.address, 'event');
-    log('Signature ID: ' + signedData.id, 'info');
-    log('✅ AUTENTICACIÓN EXITOSA', 'event');
-  } catch (e) {
-    log('Error procesando JSON firmado => ' + e.message, 'err');
-    console.error(e);
+// Simula envío al host nativo (Native Messaging)
+async function sendToNative(jsonData) {
+  // Ejemplo usando NativeWallet.sign (según tu implementación)
+  if (!window.NativeWallet) {
+    log("❌ NativeWallet no disponible", "err");
+    return null;
   }
+
+  try {
+    log("📤 Enviando JSON al host nativo...");
+    const signed = await window.NativeWallet.sign(jsonData); // Host firma el JSON
+    return signed;
+  } catch (e) {
+    log("❌ Error al enviar JSON: " + e.message, "err");
+    return null;
+  }
+}
+
+// Al hacer clic en Conectar
+connectBtn.addEventListener("click", async () => {
+  connectBtn.disabled = true;
+  log("🔄 Generando JSON de autenticación...");
   
-  e.target.value = '';
+  const authJSON = createAuthJSON();
+  log("JSON generado:");
+  log(JSON.stringify(authJSON, null, 2));
+
+  const signedData = await sendToNative(authJSON);
+  if (!signedData) {
+    log("❌ No se recibió JSON firmado", "err");
+    connectBtn.disabled = false;
+    return;
+  }
+
+  log("✅ JSON firmado recibido del host nativo:");
+  log(JSON.stringify(signedData, null, 2));
+
+  // Validar firma
+  if (signedData.signature && signedData.address) {
+    log("✅ Autenticación exitosa. Dirección: " + signedData.address);
+  } else {
+    log("❌ JSON firmado inválido", "err");
+  }
+
+  connectBtn.disabled = false;
 });
 </script>
 
